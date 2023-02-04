@@ -27,7 +27,7 @@ def launch(root_dir, import_dir, archive_dir=None):
             cleanup(work_dir)
 
         if archive_dir is not None:
-            archive.copy(root_dir, sorted_media, archive_dir)
+            archive.copy(root_dir, sorted_media, archive_dir, PREFIX)
     else:
         logger.info("No files found to import")
 
