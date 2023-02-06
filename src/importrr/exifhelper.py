@@ -11,6 +11,7 @@ def organize(import_dir, root_dir):
 
     logger.info("Renaming and sorting the files")
     with ExifToolHelper(common_args=[]) as et:
+        # verbose because we need to get the new names of the files
         output = et.execute('-verbose',
                             '-filename<${DateTimeOriginal#;DateFmt("%Y/%m")}/$DateTimeOriginal%-c.%e',
                             '-d',
@@ -27,8 +28,8 @@ def backfill_videos(import_dir, root_dir):
 
     logger.info("Updating the movie files")
     with ExifToolHelper(common_args=[]) as et:
-        output = et.execute('-verbose',
-                            '-overwrite_original',
+        # output is thrown away so we don't need verbose
+        output = et.execute('-overwrite_original',
                             '-datetimeoriginal<CreateDate',
                             '-if',
                             'not $datetimeoriginal',
