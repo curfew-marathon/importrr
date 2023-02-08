@@ -22,10 +22,8 @@ def copy(root_dir, sorted_files, archive_dir, prefix):
         if files is None:
             files.append(f)
             size = file_size
-            logger.debug("First file " + f + " " + size)
             continue
         elif size + file_size > MAX_SIZE:
-            logger.debug("Tar it!")
             if 0 == index:
                 create_tar(root_dir, files, archive_dir, prefix)
             else:
@@ -35,11 +33,16 @@ def copy(root_dir, sorted_files, archive_dir, prefix):
             index += 1
             size = 0
             files.clear()
-            logger.debug("Clear the deck " + str(index) + " " + str(size))
 
         files.append(f)
         size += file_size
-        logger.debug("Appending " + str(index) + " " + str(size))
+
+    # Clear the last tar
+    if files:
+        if 0 == index:
+            create_tar(root_dir, files, archive_dir, prefix)
+        else:
+            create_tar(root_dir, files, archive_dir, prefix + "-" + str(index))
 
 
 def create_tar(root_dir, sorted_files, archive_dir, prefix):
