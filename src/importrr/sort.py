@@ -17,7 +17,6 @@ def cleanup(work_dir):
 
 
 def sort_media(root_dir, import_dir):
-    exifhelper.backfill_videos(import_dir, root_dir)
     splits = exifhelper.organize(import_dir, root_dir)
 
     result = []
@@ -96,4 +95,4 @@ class Sort:
             if self.archive_dir is not None:
                 archive.copy(self.root_dir, sorted_media, self.archive_dir, prefix)
 
-        logger.info("Processed " + str(len(result)) + " files in " + str(time.time() - start) + "ms")
+        logger.info("Processed " + str(len(result)) + " files in " + str(time.time() - start) + "s")
