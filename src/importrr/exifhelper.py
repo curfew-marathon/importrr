@@ -2,80 +2,107 @@ import logging
 import os
 
 from exiftool import ExifToolHelper
+from exiftool.exceptions import ExifToolExecuteError
 
 logger = logging.getLogger(__name__)
 
 
-def organize_media(import_dir, root_dir):
-    with ExifToolHelper(common_args=[]) as et:
-        backfill_videos(et, import_dir, root_dir)
-        adjust_screenshots(et, import_dir, root_dir)
-        return organize_media(et, import_dir, root_dir)
-
-
-def organize_media(et, import_dir, root_dir):
-    os.chdir(root_dir)
-
+def organize(import_dir, root_dir):
     logger.info("Renaming and sorting the files")
     # verbose because we need to get the new names of the files
-    output = et.execute('-verbose',
-                        '-filename<${DateTimeOriginal#;DateFmt("%Y/%m")}/$DateTimeOriginal%-c.%e',
-                        '-d',
-                        '%Y%m%d-%H%M%S',
-                        import_dir)
+    params = ['-verbose',
+              '-filename<${DateTimeOriginal#;DateFmt("%Y/%m")}/$DateTimeOriginal%-c.%e',
+              '-d',
+              '%Y%m%d-%H%M%S',
+              import_dir]
 
+    output = run_exiftool(root_dir, params, False)
     # split string
     splits = output.split('\n')
     return splits
 
 
-def adjust_screenshots(et, import_dir, root_dir):
-    os.chdir(root_dir)
-
-    logger.info("Adjust the screenshot files")
-    # output is thrown away so we don't need verbose
+def adjust_extensions(import_dir, root_dir):
+    logger.info("Adjust the file extensions")
     # adjust the names of the PNG files which are really JPG
-    et.execute('-filename<%f.$fileTypeExtension',
-               '-ext',
-               'PNG',
-               import_dir)
+    params = ['-filename<%f.$fileTypeExtension',
+              '-ext',
+              'GIF',
+              '-ext',
+              'JPG',
+              '-ext',
+              'PNG',
+              '-ext',
+              '3GP',
+              '-ext',
+              'MOV',
+              '-ext',
+              'MP4',
+              import_dir]
+    run_exiftool(root_dir, params)
 
+
+
+def adjust_screenshots(import_dir, root_dir):
+    logger.info("Adjust the screenshots")
     # if there is any date in the metadata then add it in
-    et.execute('-overwrite_original',
-               '-datetimeoriginal<CreateDate',
-               '-if',
-               'not $datetimeoriginal',
-               '-ext',
-               'JPG',
-               '-ext',
-               'PNG',
-               import_dir)
+    params = ['-overwrite_original',
+              '-datetimeoriginal<CreateDate',
+              '-if',
+              'not $datetimeoriginal',
+              '-ext',
+              'GIF',
+              '-ext',
+              'JPG',
+              '-ext',
+              'PNG',
+              import_dir]
+    run_exiftool(root_dir, params)
 
     # for everything that's left just use the file modify date
-    et.execute('-overwrite_original',
-               '-datetimeoriginal<FileModifyDate',
-               '-if',
-               'not $datetimeoriginal',
-               '-ext',
-               'JPG',
-               '-ext',
-               'PNG',
-               import_dir)
+    params = ['-overwrite_original',
+              '-datetimeoriginal<FileModifyDate',
+              '-if',
+              'not $datetimeoriginal',
+              '-ext',
+              'GIF',
+              '-ext',
+              'JPG',
+              '-ext',
+              'PNG',
+              import_dir]
+    run_exiftool(root_dir, params)
 
 
-def backfill_videos(et, import_dir, root_dir):
+def backfill_videos(import_dir, root_dir):
     os.chdir(root_dir)
 
     logger.info("Updating the movie files")
-    # output is thrown away so we don't need verbose
-    output = et.execute('-overwrite_original',
-                        '-datetimeoriginal<CreateDate',
-                        '-if',
-                        'not $datetimeoriginal',
-                        '-ext',
-                        '3GP',
-                        '-ext',
-                        'MOV',
-                        '-ext',
-                        'MP4',
-                        import_dir)
+    params = ['-overwrite_original',
+              '-datetimeoriginal<CreateDate',
+              '-if',
+              'not $datetimeoriginal',
+              '-ext',
+              '3GP',
+              '-ext',
+              'MOV',
+              '-ext',
+              'MP4',
+              import_dir]
+
+    run_exiftool(root_dir, params)
+
+
+def run_exiftool(root_dir, params, on_error = True):
+    os.chdir(root_dir)
+
+    try:
+        with ExifToolHelper(common_args=[]) as et:
+            return et.execute(*params)
+    except ExifToolExecuteError as e:
+        # exiftool will return error code 2 when all files fail the condition
+        logger.error("stdout " + e.stdout)
+        logger.error("stderr " + e.stderr)
+        if 1 == e.returncode:
+            if on_error and " 0 image files read" not in e.stdout or not on_error:
+                raise e;

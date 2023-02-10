@@ -8,7 +8,7 @@ from importrr import archive, exifhelper
 logger = logging.getLogger(__name__)
 
 # in minutes
-TIME_CUTOFF = 3
+TIME_CUTOFF = 2
 
 
 def cleanup(work_dir):
@@ -17,6 +17,9 @@ def cleanup(work_dir):
 
 
 def sort_media(root_dir, import_dir):
+    exifhelper.adjust_extensions(import_dir, root_dir)
+    exifhelper.adjust_screenshots(import_dir, root_dir)
+    exifhelper.backfill_videos(import_dir, root_dir)
     splits = exifhelper.organize(import_dir, root_dir)
 
     result = []
@@ -25,7 +28,7 @@ def sort_media(root_dir, import_dir):
         if -1 != index:
             s = split[index + 6:-1]
             result.append(s)
-            logger.debug("Media moved to " + s)
+    logger.info("Organized " + str(len(result)) + " files to " + root_dir)
     return result
 
 
@@ -39,9 +42,9 @@ def get_media_files(import_dir, time_cutoff):
             if last_time <= time_cutoff:
                 result.append(d)
             else:
-                logger.info("Skipping file " + d)
+                logger.info("Skipping recently accessed file " + d)
         elif os.path.isdir(f):
-            logger.info("Found directory " + d)
+            logger.info("Skipping directory " + d)
         else:
             logger.warning("Cannot resolve " + d)
     return result
@@ -54,8 +57,8 @@ def make_work_dir(cur_dir, work_dir, file_list):
     for f in file_list:
         f_from = os.path.join(cur_dir, f)
         f_to = os.path.join(work_dir, f)
-        logger.debug("Rename " + f_from + " to " + f_to)
         os.rename(f_from, f_to)
+    logger.info("Moved " + str(len(file_list)) + " files to " + work_dir)
 
 
 def last_accessed(file):
@@ -69,9 +72,9 @@ class Sort:
 
     def __init__(self, root_dir, archive_dir=None):
         if not os.path.isdir(root_dir):
-            raise Exception("Directory doesn't exist " + root_dir)
+            raise IOError("Directory doesn't exist " + root_dir)
         if archive_dir is not None and not os.path.isdir(archive_dir):
-            raise Exception("Directory doesn't exist " + archive_dir)
+            raise IOError("Directory doesn't exist " + archive_dir)
         self.root_dir = root_dir
         self.archive_dir = archive_dir
 
