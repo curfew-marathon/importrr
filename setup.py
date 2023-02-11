@@ -9,5 +9,5 @@ setup(
     license='GNU',
     author='curfew-marathon',
     author_email='curfew-marathon',
-    description='Importrr'
+    description='importrr'
 )
