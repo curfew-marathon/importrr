@@ -98,4 +98,4 @@ class Sort:
             if self.archive_dir is not None:
                 archive.copy(self.root_dir, sorted_media, self.archive_dir, prefix)
 
-        logger.info("Processed " + str(len(result)) + " files in " + str(time.time() - start) + "s")
+        logger.info(import_dir + " processed " + str(len(result)) + " files in " + str(time.time() - start) + "s")
