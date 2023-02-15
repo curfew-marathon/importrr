@@ -101,8 +101,12 @@ def run_exiftool(root_dir, params, on_error = True):
             return et.execute(*params)
     except ExifToolExecuteError as e:
         # exiftool will return error code 2 when all files fail the condition
-        logger.error("stdout " + e.stdout)
-        logger.error("stderr " + e.stderr)
+        if e.stdout is not None:
+            logger.warning("stdout")
+            logger.warning(e.stdout)
+        if e.stderr is not None:
+            logger.warning("stderr")
+            logger.warning(e.stderr)
         if 1 == e.returncode:
             if on_error and " 0 image files read" not in e.stdout or not on_error:
                 raise e;
