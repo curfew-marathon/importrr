@@ -42,7 +42,6 @@ def adjust_extensions(import_dir, root_dir):
     run_exiftool(root_dir, params)
 
 
-
 def adjust_screenshots(import_dir, root_dir):
     logger.info("Adjust the screenshots")
     # if there is any date in the metadata then add it in
@@ -74,9 +73,18 @@ def adjust_screenshots(import_dir, root_dir):
     run_exiftool(root_dir, params)
 
 
-def backfill_videos(import_dir, root_dir):
-    os.chdir(root_dir)
+def copy_tags(root_dir, input_file, output_file):
+    logger.info("Copying the tags over " + input_file + " -> " + output_file)
+    params = ['-overwrite_original',
+              '-TagsFromFile',
+              input_file,
+              '-all:all>all:all',
+              output_file]
 
+    run_exiftool(root_dir, params)
+
+
+def backfill_videos(import_dir, root_dir):
     logger.info("Updating the movie files")
     params = ['-overwrite_original',
               '-datetimeoriginal<CreateDate',
@@ -93,7 +101,7 @@ def backfill_videos(import_dir, root_dir):
     run_exiftool(root_dir, params)
 
 
-def run_exiftool(root_dir, params, on_error = True):
+def run_exiftool(root_dir, params, on_error=True):
     os.chdir(root_dir)
 
     try:
