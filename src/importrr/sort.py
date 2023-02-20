@@ -88,7 +88,7 @@ class Sort:
         if result:
             work_dir = os.path.join(import_dir, prefix)
             make_work_dir(import_dir, work_dir, result)
-            sorted_media = sort_media(self.root_dir, os.path.join('', 'import', prefix))
+            sorted_media = sort_media(self.root_dir, os.path.join('', import_dir, prefix))
             if os.listdir(work_dir):
                 logger.warning("Was not able to clear all files")
             else:

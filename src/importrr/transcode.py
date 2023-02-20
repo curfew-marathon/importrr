@@ -23,7 +23,7 @@ def convert(root_dir, source_file):
 def transcode(input_file, output_file):
     try:
         ff = ffmpy.FFmpeg(
-            inputs={input_file: None},
+            inputs={input_file: '-y'},
             outputs={
                 output_file: FFMPEG_PARAMS}
         )

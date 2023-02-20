@@ -47,6 +47,7 @@ def adjust_screenshots(import_dir, root_dir):
     # if there is any date in the metadata then add it in
     params = ['-overwrite_original',
               '-datetimeoriginal<CreateDate',
+              '-time:all<$CreateDate',
               '-if',
               'not $datetimeoriginal',
               '-ext',
@@ -61,6 +62,7 @@ def adjust_screenshots(import_dir, root_dir):
     # for everything that's left just use the file modify date
     params = ['-overwrite_original',
               '-datetimeoriginal<FileModifyDate',
+              '-time:all<$FileModifyDate',
               '-if',
               'not $datetimeoriginal',
               '-ext',
@@ -85,9 +87,15 @@ def copy_tags(root_dir, input_file, output_file):
 
 
 def backfill_videos(import_dir, root_dir):
-    logger.info("Updating the movie files")
+    backfill_video_tag(import_dir, root_dir, 'CreationDate')
+    backfill_video_tag(import_dir, root_dir, 'CreateDate')
+
+
+def backfill_video_tag(import_dir, root_dir, tag):
+    logger.info("Updating the movie files by " + tag)
     params = ['-overwrite_original',
-              '-datetimeoriginal<CreateDate',
+              '-datetimeoriginal<' + tag,
+              '-time:all<$' + tag,
               '-if',
               'not $datetimeoriginal',
               '-ext',
@@ -97,7 +105,6 @@ def backfill_videos(import_dir, root_dir):
               '-ext',
               'MP4',
               import_dir]
-
     run_exiftool(root_dir, params)
 
 
