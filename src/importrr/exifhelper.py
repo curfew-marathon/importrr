@@ -25,7 +25,7 @@ def organize(import_dir, root_dir):
 def adjust_extensions(import_dir, root_dir):
     logger.info("Adjust the file extensions")
     # adjust the names of the PNG files which are really JPG
-    params = ['-filename<%f.$fileTypeExtension',
+    params = ['-filename<%f_$imagesize_%e.$fileTypeExtension',
               '-ext',
               'GIF',
               '-ext',
