@@ -24,8 +24,8 @@ def organize(import_dir, root_dir):
 
 def adjust_extensions(import_dir, root_dir):
     logger.info("Adjust the file extensions")
-    # adjust the names of the PNG files which are really JPG
-    params = ['-filename<%f_$imagesize_%e.$fileTypeExtension',
+    # adjust the names of the files based on their MIME type so Exiftool doesn't error out
+    params = ['-filename<%f.$fileTypeExtension',
               '-ext',
               'GIF',
               '-ext',
@@ -46,8 +46,21 @@ def adjust_screenshots(import_dir, root_dir):
     logger.info("Adjust the screenshots")
     # if there is any date in the metadata then add it in
     params = ['-overwrite_original',
-              '-datetimeoriginal<CreateDate',
-              '-time:all<$CreateDate',
+              '-EXIF:DateTimeOriginal<PNG:CreateDate',
+              '-XMP:DateCreated<PNG:CreateDate',
+              '-if',
+              'not $datetimeoriginal',
+              '-ext',
+              'GIF',
+              '-ext',
+              'JPG',
+              '-ext',
+              'PNG',
+              import_dir]
+    run_exiftool(root_dir, params)
+
+    params = ['-overwrite_original',
+              '-EXIF:DateTimeOriginal<XMP:DateCreated',
               '-if',
               'not $datetimeoriginal',
               '-ext',
@@ -61,8 +74,8 @@ def adjust_screenshots(import_dir, root_dir):
 
     # for everything that's left just use the file modify date
     params = ['-overwrite_original',
-              '-datetimeoriginal<FileModifyDate',
-              '-time:all<$FileModifyDate',
+              '-EXIF:DateTimeOriginal<FileModifyDate',
+              '-XMP:DateCreated<FileModifyDate',
               '-if',
               'not $datetimeoriginal',
               '-ext',
@@ -124,4 +137,4 @@ def run_exiftool(root_dir, params, on_error=True):
             logger.warning(e.stderr)
         if 1 == e.returncode:
             if on_error and " 0 image files read" not in e.stdout or not on_error:
-                raise e;
+                raise e
