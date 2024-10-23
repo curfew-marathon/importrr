@@ -27,4 +27,4 @@ jobs:
         with:
           context: DockerFileFolder/
           push: true
-          tags: ${{DOCKER_USERNAME}}/importrr:latest
+          tags: ${{secrets.DOCKER_USERNAME}}/importrr:latest
