@@ -1,18 +1,30 @@
 name: Docker Image CI
 
 on:
-  push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
+  push
 
 jobs:
 
-  build:
+  push_to_registry:
+  
+    name: push docker image to hub
 
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
-    - name: Build the Docker image
-      run: docker build . --file Dockerfile --tag importrr:$(date +%s)
+
+      - name: check repository
+        uses: actions/checkout@v4
+
+      - name: login to docker registry
+        uses: docker/login-action@v3
+        with:
+          username: ${{DOCKER_USERNAME}}
+          password: ${{DOCKER_TOKEN}}
+
+      - name: build and push docker image to registry
+        uses: docker/build-push-action@v5
+        with:
+          context: DockerFileFolder/
+          push: true
+          tags: ${{DOCKER_USERNAME}}/importrr:latest
