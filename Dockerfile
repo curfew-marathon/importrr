@@ -14,7 +14,7 @@ COPY requirements.txt requirements.txt
 RUN pip3 install --no-cache-dir --root-user-action=ignore -r requirements.txt
 
 # Setup the crontab
-RUN echo '0 6-22/2 * * *    python3 /app/launch.py' > /etc/crontabs/root
+RUN echo '0 6-22/2 * * *    python3 /app/launch.py >> /app/log-$(date +\%Y\%m\%d_\%H\%M\%S).log 2>&1' > /etc/crontabs/root
 
 # Go for launch!
 CMD ["/usr/sbin/crond", "-f"]
