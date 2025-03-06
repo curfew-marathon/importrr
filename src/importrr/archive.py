@@ -7,7 +7,7 @@ from importrr import transcode
 logger = logging.getLogger(__name__)
 
 # Max Tar size in GB
-MAX_SIZE = 2 * 1000000000
+MAX_SIZE = 1000000000
 
 
 def copy(root_dir, sorted_files, archive_dir, prefix):
