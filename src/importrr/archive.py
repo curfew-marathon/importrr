@@ -56,8 +56,11 @@ def copy(root_dir, sorted_files, archive_dir, prefix):
     if files:
         logger.info(f"Creating final archive {index}")
         create_tar(root_dir, files, archive_dir, prefix, index)
+        total_archives = index + 1
+    else:
+        total_archives = index  # No final archive was created
     
-    logger.info(f"Archive creation completed - created {index + 1} archive(s)")
+    logger.info(f"Archive creation completed - created {total_archives} archive(s)")
 
 
 def create_tar(root_dir, sorted_files, archive_dir, prefix, index):

@@ -28,32 +28,61 @@ def sort_media(root_dir, import_dir):
 
     result = []
     for split in splits:
+        if not split or not split.strip():  # Skip empty lines
+            continue
+            
         index = split.find(' --> ')
-        if -1 != index:
-            s = split[index + 6:-1]
-            result.append(s)
-    logger.info("Organized " + str(len(result)) + " files to " + root_dir)
+        if index != -1:  # More pythonic comparison
+            try:
+                s = split[index + 6:-1]
+                if s and s.strip():  # Only add non-empty results
+                    result.append(s.strip())
+            except IndexError:
+                logger.warning(f"Failed to parse ExifTool output line: {split}")
+                continue
+                
+    logger.info(f"Organized {len(result)} files to {root_dir}")
     return result
 
 
 def get_media_files(import_dir, time_cutoff):
+    if not os.path.exists(import_dir):
+        logger.warning(f"Import directory does not exist: {import_dir}")
+        return []
+        
+    if not os.path.isdir(import_dir):
+        logger.error(f"Import path is not a directory: {import_dir}")
+        return []
+    
+    try:
+        entries = os.listdir(import_dir)
+    except PermissionError as e:
+        logger.error(f"Permission denied accessing directory {import_dir}: {e}")
+        return []
+    except OSError as e:
+        logger.error(f"Error accessing directory {import_dir}: {e}")
+        return []
+        
     result = []
-    entries = os.listdir(import_dir)
     logger.debug(f"Scanning {len(entries)} entries in {import_dir}")
     
     for d in entries:
         f = os.path.join(import_dir, d)
-        if os.path.isfile(f):
-            last_time = last_accessed(f)
-            if last_time <= time_cutoff:
-                result.append(d)
-                logger.debug(f"Added file for processing: {d}")
+        try:
+            if os.path.isfile(f):
+                last_time = last_accessed(f)
+                if last_time <= time_cutoff:
+                    result.append(d)
+                    logger.debug(f"Added file for processing: {d}")
+                else:
+                    logger.debug(f"Skipping recently accessed file: {d}")
+            elif os.path.isdir(f):
+                logger.debug(f"Skipping directory: {d}")
             else:
-                logger.debug(f"Skipping recently accessed file: {d}")
-        elif os.path.isdir(f):
-            logger.debug(f"Skipping directory: {d}")
-        else:
-            logger.warning(f"Cannot resolve file type for: {d}")
+                logger.warning(f"Cannot resolve file type for: {d}")
+        except (OSError, PermissionError) as e:
+            logger.warning(f"Cannot access {d}: {e}")
+            continue
     
     logger.info(f"Found {len(result)} files ready for processing in {import_dir}")
     return result
@@ -65,11 +94,25 @@ def make_work_dir(cur_dir, work_dir, file_list):
         return
     try:
         logger.debug(f"Creating work directory: {work_dir}")
-        os.mkdir(work_dir)
+        
+        # Handle case where directory already exists
+        if os.path.exists(work_dir):
+            if os.path.isdir(work_dir):
+                logger.warning(f"Work directory already exists, using existing: {work_dir}")
+            else:
+                raise OSError(f"Work directory path exists but is not a directory: {work_dir}")
+        else:
+            os.mkdir(work_dir)
         
         for f in file_list:
             f_from = os.path.join(cur_dir, f)
             f_to = os.path.join(work_dir, f)
+            
+            # Check if target file already exists
+            if os.path.exists(f_to):
+                logger.warning(f"Target file already exists, skipping: {f}")
+                continue
+                
             os.rename(f_from, f_to)
             logger.debug(f"Moved file: {f}")
             

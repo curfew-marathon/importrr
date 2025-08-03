@@ -27,8 +27,12 @@ class Config:
         if 'global' not in parser.sections():
             raise ValueError("Missing required 'global' section in configuration")
 
-        self.album_root = parser['global']['album_dir']
-        self.archive_root = parser['global']['archive_dir']
+        try:
+            self.album_root = parser['global']['album_dir']
+            self.archive_root = parser['global']['archive_dir']
+        except KeyError as e:
+            raise ValueError(f"Missing required configuration field in 'global' section: {e}")
+            
         logger.info(f"Album root directory: {self.album_root}")
         logger.info(f"Archive root directory: {self.archive_root}")
         
@@ -40,7 +44,18 @@ class Config:
 
             logger.debug(f"Processing configuration section: {section_name}")
             album_dir = os.path.join(self.album_root, section_name)
+            
+            # Validate required fields for each section
+            if 'import_dir' not in parser[section_name]:
+                raise ValueError(f"Missing required 'import_dir' field in section '{section_name}'")
+                
             import_value = parser[section_name]['import_dir'].split(',')
+            # Strip whitespace from import directories
+            import_value = [dir.strip() for dir in import_value if dir.strip()]
+            
+            if not import_value:
+                raise ValueError(f"Empty or invalid 'import_dir' field in section '{section_name}'")
+                
             serial = parser[section_name].get('serial', None)  # Use get() to avoid KeyError
             archive_dir = os.path.join(self.archive_root, section_name)
 
