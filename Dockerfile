@@ -17,10 +17,11 @@ RUN pip3 install --no-cache-dir --root-user-action=ignore -r requirements.txt
 WORKDIR /app
 
 # Environment variables for scheduling (can be overridden)
+ENV SCHEDULER_MODE="true"
 ENV SCHEDULE_HOUR="6-22/2"
 ENV SCHEDULE_MINUTE="0"
 ENV TIMEZONE="UTC"
 ENV RUN_ON_STARTUP="false"
 
 # Go for launch with the scheduler!
-CMD ["python3", "scheduler.py"]
+CMD ["python3", "launch.py"]
