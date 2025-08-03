@@ -15,9 +15,20 @@ def convert(root_dir, source_file):
     output_file = os.path.join(root_dir, result)
     input_file = os.path.join(root_dir, source_file)
 
-    transcode(input_file, output_file)
-    exifhelper.copy_tags(root_dir, input_file, output_file)
-    return result
+    if not os.path.exists(input_file):
+        logger.error(f"Input file does not exist: {input_file}")
+        return None  # Return None to skip file if conversion fails
+
+    try:
+        transcode(input_file, output_file)
+        if not os.path.exists(output_file):
+            logger.error(f"Output file was not created: {output_file}")
+            return None
+        exifhelper.copy_tags(root_dir, input_file, output_file)
+        return result
+    except Exception as e:
+        logger.error(f"Failed to convert {source_file}: {e}")
+        return None  # Return None to skip file if conversion fails
 
 
 def transcode(input_file, output_file):
@@ -33,5 +44,7 @@ def transcode(input_file, output_file):
         logger.error(e.exit_code)
         logger.error(e.stdout)
         logger.error(e.stderr)
-        os.remove(output_file)
+        # Safely remove output file if it exists
+        if os.path.exists(output_file):
+            os.remove(output_file)
         raise e

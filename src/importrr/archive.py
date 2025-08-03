@@ -21,9 +21,12 @@ def copy(root_dir, sorted_files, archive_dir, prefix):
     for f in sorted_files:
         if f.endswith(".mov"):
             f = transcode.convert(root_dir, f)
+            if f is None:
+                logger.warning("Skipping file due to conversion failure")
+                continue  # Skip this file if conversion failed
         file = os.path.join(root_dir, f)
         file_size = os.stat(file).st_size
-        if files is None:
+        if not files:  # Check if list is empty instead of None
             files.append(f)
             size = file_size
             continue

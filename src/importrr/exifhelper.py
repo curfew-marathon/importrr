@@ -136,5 +136,5 @@ def run_exiftool(root_dir, params, on_error=True):
             logger.warning("stderr")
             logger.warning(e.stderr)
         if 1 == e.returncode:
-            if on_error and " 0 image files read" not in e.stdout or not on_error:
+            if (on_error and " 0 image files read" not in e.stdout) or not on_error:
                 raise e
