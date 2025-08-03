@@ -19,8 +19,6 @@ WORKDIR /app
 # Environment variables for scheduling (can be overridden)
 ENV SCHEDULER_MODE="true"
 ENV SCHEDULE_HOUR="6-22/2"
-ENV SCHEDULE_MINUTE="0"
-ENV TIMEZONE="UTC"
 ENV RUN_ON_STARTUP="false"
 
 # Go for launch with the scheduler!

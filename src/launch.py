@@ -55,11 +55,11 @@ class ImportrrScheduler:
         
         # Get schedule from environment variables or use defaults
         self.schedule_hour = os.getenv('SCHEDULE_HOUR', '6-22/2')  # Every 2 hours from 6am to 10pm
-        self.schedule_minute = os.getenv('SCHEDULE_MINUTE', '0')   # At the top of the hour
-        self.timezone = os.getenv('TIMEZONE', 'UTC')
+        self.schedule_minute = '0'  # Always run at the top of the hour
+        self.timezone = None  # Use local timezone
         
-        logger.info(f"Scheduler initialized with schedule: {self.schedule_minute} {self.schedule_hour} * * *")
-        logger.info(f"Timezone: {self.timezone}")
+        logger.info(f"Scheduler initialized with schedule: {self.schedule_minute} {self.schedule_hour} * * * (local timezone)")
+        logger.info(f"This means: every 2 hours from 6 AM to 10 PM, at the top of the hour")
     
     def setup_signal_handlers(self):
         """Setup graceful shutdown handlers"""
