@@ -4,17 +4,13 @@ import sys
 import os
 from datetime import datetime
 
+from apscheduler.schedulers.blocking import BlockingScheduler
+from apscheduler.triggers.cron import CronTrigger
+
 from importrr.config import Config
 from importrr.sort import Sort
 
-# Check if we're running as scheduler or one-time
-SCHEDULER_MODE = os.getenv('SCHEDULER_MODE', 'true').lower() == 'true'  # Default to scheduler mode for Docker
-
-if SCHEDULER_MODE:
-    from apscheduler.schedulers.blocking import BlockingScheduler
-    from apscheduler.triggers.cron import CronTrigger
-
-logging.basicConfig(level=logging.INFO,  # Change to INFO by default, DEBUG is too verbose
+logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s %(levelname)-8s [%(name)s] %(message)s',
                     datefmt='%Y-%m-%d %H:%M:%S')
 
@@ -53,14 +49,6 @@ class ImportrrScheduler:
         self.scheduler = BlockingScheduler()
         self.setup_signal_handlers()
         
-        # Get schedule from environment variables or use defaults
-        self.schedule_hour = os.getenv('SCHEDULE_HOUR', '6-22/2')  # Every 2 hours from 6am to 10pm
-        self.schedule_minute = '0'  # Always run at the top of the hour
-        self.timezone = None  # Use local timezone
-        
-        logger.info(f"Scheduler initialized with schedule: {self.schedule_minute} {self.schedule_hour} * * * (local timezone)")
-        logger.info(f"This means: every 2 hours from 6 AM to 10 PM, at the top of the hour")
-    
     def setup_signal_handlers(self):
         """Setup graceful shutdown handlers"""
         def signal_handler(signum, frame):
@@ -102,14 +90,10 @@ class ImportrrScheduler:
     def start(self):
         """Start the scheduler"""
         try:
-            # Add the job with cron trigger
+            # Add the job - every 2 hours from 8 AM to 10 PM
             self.scheduler.add_job(
                 func=self.run_import_job,
-                trigger=CronTrigger(
-                    minute=self.schedule_minute,
-                    hour=self.schedule_hour,
-                    timezone=self.timezone
-                ),
+                trigger=CronTrigger(minute=0, hour='8-22/2'),
                 id='import_job',
                 name='Import Media Files',
                 misfire_grace_time=300,  # 5 minutes grace period
@@ -117,48 +101,24 @@ class ImportrrScheduler:
                 max_instances=1  # Only one instance at a time
             )
             
-            logger.info("Scheduler started successfully")
-            logger.info("Next scheduled runs:")
-            for job in self.scheduler.get_jobs():
-                next_run = job.next_run_time
-                logger.info(f"  - {job.name}: {next_run}")
+            logger.info("Importrr scheduler started (every 2 hours from 8 AM to 10 PM)")
             
-            # Start the scheduler (this blocks)
+            # Run once on startup
+            logger.info("Running initial import on startup...")
+            self.run_import_job()
+            
+            # Start the scheduler for future runs
+            logger.info("Starting scheduled runs...")
             self.scheduler.start()
             
-        except KeyboardInterrupt:
-            logger.info("Scheduler interrupted by user")
+        except (KeyboardInterrupt, SystemExit):
+            logger.info("Scheduler shutdown requested")
         except Exception as e:
-            logger.error(f"Scheduler failed to start: {e}")
+            logger.error(f"Scheduler error: {e}")
+            logger.debug("Full traceback:", exc_info=True)
             sys.exit(1)
 
-def run_scheduler():
-    """Run the scheduler service"""
-    if not SCHEDULER_MODE:
-        logger.error("APScheduler not available. Install with: pip install APScheduler")
-        sys.exit(1)
-        
+if __name__ == '__main__':
     logger.info("Starting importrr scheduler service")
-    
-    # Check if we should run immediately on startup
-    run_on_startup = os.getenv('RUN_ON_STARTUP', 'false').lower() == 'true'
-    if run_on_startup:
-        logger.info("RUN_ON_STARTUP=true, running import job immediately...")
-        scheduler = ImportrrScheduler()
-        scheduler.run_import_job()
-    
-    # Start the scheduler
     scheduler = ImportrrScheduler()
     scheduler.start()
-
-if __name__ == '__main__':
-    # Check what mode we're running in
-    if SCHEDULER_MODE:
-        # Running as scheduler service
-        run_scheduler()
-    else:
-        # Running as one-time execution (traditional behavior)
-        try:
-            main_process()
-        except Exception:
-            exit(1)
