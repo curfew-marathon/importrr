@@ -14,7 +14,7 @@ importrr is a Python application designed to automate importing of image and mov
 
 # Configuration
 
-The configuration file is read from `/config/config.ini`
+The configuration file is read from `/config/config.ini` (or `config.ini` in the current directory)
 
 ## File structure:
 

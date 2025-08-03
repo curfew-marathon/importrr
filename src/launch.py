@@ -102,6 +102,7 @@ class ImportrrScheduler:
             )
             
             logger.info("Importrr scheduler started (every 2 hours from 8 AM to 10 PM)")
+            logger.info("Scheduler configured with max_instances=1 to prevent overlapping jobs")
             
             # Run once on startup
             logger.info("Running initial import on startup...")
