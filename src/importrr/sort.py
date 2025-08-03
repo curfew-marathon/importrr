@@ -13,8 +13,9 @@ TIME_CUTOFF = 2
 
 def cleanup(work_dir):
     try:
-        logger.info("Removing directory " + work_dir)
+        logger.debug(f"Removing temporary directory: {work_dir}")
         os.rmdir(work_dir)
+        logger.debug(f"Successfully removed directory: {work_dir}")
     except OSError as e:
         logger.error(f"Failed to remove directory {work_dir}: {e}")
 
@@ -38,31 +39,41 @@ def sort_media(root_dir, import_dir):
 def get_media_files(import_dir, time_cutoff):
     result = []
     entries = os.listdir(import_dir)
+    logger.debug(f"Scanning {len(entries)} entries in {import_dir}")
+    
     for d in entries:
         f = os.path.join(import_dir, d)
         if os.path.isfile(f):
             last_time = last_accessed(f)
             if last_time <= time_cutoff:
                 result.append(d)
+                logger.debug(f"Added file for processing: {d}")
             else:
-                logger.info("Skipping recently accessed file " + d)
+                logger.debug(f"Skipping recently accessed file: {d}")
         elif os.path.isdir(f):
-            logger.info("Skipping directory " + d)
+            logger.debug(f"Skipping directory: {d}")
         else:
-            logger.warning("Cannot resolve " + d)
+            logger.warning(f"Cannot resolve file type for: {d}")
+    
+    logger.info(f"Found {len(result)} files ready for processing in {import_dir}")
     return result
 
 
 def make_work_dir(cur_dir, work_dir, file_list):
     if not file_list:
+        logger.debug("No files to move, skipping work directory creation")
         return
     try:
+        logger.debug(f"Creating work directory: {work_dir}")
         os.mkdir(work_dir)
+        
         for f in file_list:
             f_from = os.path.join(cur_dir, f)
             f_to = os.path.join(work_dir, f)
             os.rename(f_from, f_to)
-        logger.info("Moved " + str(len(file_list)) + " files to " + work_dir)
+            logger.debug(f"Moved file: {f}")
+            
+        logger.info(f"Moved {len(file_list)} files to temporary processing directory")
     except OSError as e:
         logger.error(f"Failed to create work directory or move files: {e}")
         raise
@@ -86,23 +97,33 @@ class Sort:
         self.archive_dir = archive_dir
 
     def launch(self, import_dir):
+        logger.info(f"Starting processing for import directory: {import_dir}")
         start = time.time()
         time_cutoff = start - 60 * TIME_CUTOFF
         prefix = datetime.fromtimestamp(time_cutoff).strftime('%Y%m%d%H%M%S')
 
         import_dir = os.path.join(self.root_dir, import_dir)
         result = get_media_files(import_dir, time_cutoff)
+        
         if result:
+            logger.info(f"Processing {len(result)} files")
             work_dir = os.path.join(import_dir, prefix)
             make_work_dir(import_dir, work_dir, result)
             sorted_media = sort_media(self.root_dir, work_dir)  # Use work_dir directly
-            if os.listdir(work_dir):
-                logger.warning("Was not able to clear all files")
+            
+            remaining_files = os.listdir(work_dir) if os.path.exists(work_dir) else []
+            if remaining_files:
+                logger.warning(f"Unable to process {len(remaining_files)} files - they remain in {work_dir}")
+                logger.debug(f"Remaining files: {remaining_files}")
             else:
-                logger.info("Cleared all files")
+                logger.info("Successfully processed all files")
                 cleanup(work_dir)
 
             if self.archive_dir is not None:
+                logger.info(f"Creating archive with {len(sorted_media)} files")
                 archive.copy(self.root_dir, sorted_media, self.archive_dir, prefix)
+        else:
+            logger.info("No files found for processing")
 
-        logger.info(import_dir + " processed " + str(len(result)) + " files in " + str(time.time() - start) + "s")
+        elapsed = time.time() - start
+        logger.info(f"Completed processing {len(result)} files in {elapsed:.2f}s")
