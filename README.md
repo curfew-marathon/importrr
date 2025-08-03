@@ -45,10 +45,10 @@ importrr comes with a simple Docker container to run the application.  It will r
 importrr uses APScheduler for intelligent job scheduling instead of cron. This provides better error handling, logging, and configuration flexibility.
 
 The main entry point `launch.py` can run in two modes:
-- **One-time execution** (default): Runs the import process once and exits
-- **Scheduler mode**: Runs continuously on a schedule
+- **One-time execution**: Runs the import process once and exits
+- **Scheduler mode** (default for Docker): Runs continuously on a schedule
 
-## Default Schedule
+## Default Schedule (Docker)
 - **Runs every 2 hours** from 6 AM to 10 PM (6-22/2)
 - **Always at the top of the hour** (minute 0)
 - **Local timezone** (whatever timezone the container/system is set to)
@@ -56,9 +56,9 @@ The main entry point `launch.py` can run in two modes:
 
 ## Configuration
 
-You can customize the schedule using environment variables:
+For local development, you can customize behavior using environment variables:
 
-- `SCHEDULER_MODE`: Enable scheduler mode (default: "false")
+- `SCHEDULER_MODE`: Enable scheduler mode (default: "true" for Docker, "false" for local)
 - `SCHEDULE_HOUR`: Hour pattern (default: "6-22/2" = every 2 hours from 6am-10pm)
 - `RUN_ON_STARTUP`: Run immediately on startup in scheduler mode (default: "false")
 
@@ -85,7 +85,7 @@ python3 run_now.py
 
 ## Docker:
 
-**Build and run with scheduler (default):**
+**Build and run with default scheduler:**
 ```bash
 cd importrr    
 docker build -t importrr .
@@ -97,14 +97,9 @@ docker run -d importrr
 docker run --rm -e SCHEDULER_MODE=false importrr
 ```
 
-**Run with custom schedule (every hour):**
+**Run with custom schedule (every hour) - for advanced users:**
 ```bash
 docker run -d -e SCHEDULE_HOUR="*" importrr
-```
-
-**Run with immediate execution:**
-```bash
-docker run -d -e RUN_ON_STARTUP="true" importrr
 ```
 
 **Manual run in container:**

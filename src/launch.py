@@ -8,7 +8,7 @@ from importrr.config import Config
 from importrr.sort import Sort
 
 # Check if we're running as scheduler or one-time
-SCHEDULER_MODE = os.getenv('SCHEDULER_MODE', 'false').lower() == 'true'
+SCHEDULER_MODE = os.getenv('SCHEDULER_MODE', 'true').lower() == 'true'  # Default to scheduler mode for Docker
 
 if SCHEDULER_MODE:
     from apscheduler.schedulers.blocking import BlockingScheduler
