@@ -12,8 +12,11 @@ TIME_CUTOFF = 2
 
 
 def cleanup(work_dir):
-    logger.info("Removing directory " + work_dir)
-    os.rmdir(work_dir)
+    try:
+        logger.info("Removing directory " + work_dir)
+        os.rmdir(work_dir)
+    except OSError as e:
+        logger.error(f"Failed to remove directory {work_dir}: {e}")
 
 
 def sort_media(root_dir, import_dir):
@@ -53,12 +56,16 @@ def get_media_files(import_dir, time_cutoff):
 def make_work_dir(cur_dir, work_dir, file_list):
     if not file_list:
         return
-    os.mkdir(work_dir)
-    for f in file_list:
-        f_from = os.path.join(cur_dir, f)
-        f_to = os.path.join(work_dir, f)
-        os.rename(f_from, f_to)
-    logger.info("Moved " + str(len(file_list)) + " files to " + work_dir)
+    try:
+        os.mkdir(work_dir)
+        for f in file_list:
+            f_from = os.path.join(cur_dir, f)
+            f_to = os.path.join(work_dir, f)
+            os.rename(f_from, f_to)
+        logger.info("Moved " + str(len(file_list)) + " files to " + work_dir)
+    except OSError as e:
+        logger.error(f"Failed to create work directory or move files: {e}")
+        raise
 
 
 def last_accessed(file):
@@ -88,7 +95,7 @@ class Sort:
         if result:
             work_dir = os.path.join(import_dir, prefix)
             make_work_dir(import_dir, work_dir, result)
-            sorted_media = sort_media(self.root_dir, os.path.join('', import_dir, prefix))
+            sorted_media = sort_media(self.root_dir, work_dir)  # Use work_dir directly
             if os.listdir(work_dir):
                 logger.warning("Was not able to clear all files")
             else:

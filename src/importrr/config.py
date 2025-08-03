@@ -20,7 +20,7 @@ class Config:
 
             album_dir = os.path.join(self.album_root, section_name)
             import_value = parser[section_name]['import_dir'].split(',')
-            serial = parser[section_name]['serial']
+            serial = parser[section_name].get('serial', None)  # Use get() to avoid KeyError
             archive_dir = os.path.join(self.archive_root, section_name)
 
             d = {'album': album_dir, 'archive': archive_dir, 'import': import_value, 'serial': serial}
