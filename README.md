@@ -40,17 +40,66 @@ Image files which cannot be cleaned, are corrupted or have malformed EXIF data w
 
 importrr comes with a simple Docker container to run the application.  It will require the configuration folder, preferably mounted as well as the image folders, also mounted.  The application runs in a <code>cron</code>job as usually the image files are stored on a network share and it's impossible to listen for file creation events.  
 
+# Scheduling
+
+importrr uses APScheduler for intelligent job scheduling instead of cron. This provides better error handling, logging, and configuration flexibility.
+
+## Default Schedule
+- **Runs every 2 hours** from 6 AM to 10 PM (6-22/2)
+- **Timezone**: UTC (configurable)
+- **Graceful error handling** - failed jobs don't stop the scheduler
+
+## Configuration
+
+You can customize the schedule using environment variables:
+
+- `SCHEDULE_HOUR`: Hour pattern (default: "6-22/2" = every 2 hours from 6am-10pm)
+- `SCHEDULE_MINUTE`: Minute pattern (default: "0" = top of the hour)  
+- `TIMEZONE`: Timezone for scheduling (default: "UTC")
+- `RUN_ON_STARTUP`: Run immediately on startup (default: "false")
+
 # Usage
 
-Local:
+## Local Development:
 
-<code>python3 launch.py</code>
+**Manual run:**
+```bash
+python3 launch.py
+```
 
-Docker:
+**Start scheduler:**
+```bash
+python3 scheduler.py
+```
 
-    cd importrr    
-    docker build -t importrr .
-    docker run importrr -d
+**Quick manual run:**
+```bash
+python3 run_now.py
+```
+
+## Docker:
+
+**Build and run with default schedule:**
+```bash
+cd importrr    
+docker build -t importrr .
+docker run -d importrr
+```
+
+**Run with custom schedule (every hour):**
+```bash
+docker run -d -e SCHEDULE_HOUR="*" -e SCHEDULE_MINUTE="0" importrr
+```
+
+**Run with immediate execution:**
+```bash
+docker run -d -e RUN_ON_STARTUP="true" importrr
+```
+
+**Manual run in container:**
+```bash
+docker exec -it <container_id> python3 run_now.py
+```
 
 # License
 

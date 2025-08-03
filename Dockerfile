@@ -13,8 +13,14 @@ COPY src /app
 COPY requirements.txt requirements.txt
 RUN pip3 install --no-cache-dir --root-user-action=ignore -r requirements.txt
 
-# Setup the crontab
-RUN echo '0 6-22/2 * * *    python3 /app/launch.py >> /app/log-$(date +\%Y\%m\%d_\%H\%M\%S).log 2>&1' > /etc/crontabs/root
+# Set working directory
+WORKDIR /app
 
-# Go for launch!
-CMD ["/usr/sbin/crond", "-f"]
+# Environment variables for scheduling (can be overridden)
+ENV SCHEDULE_HOUR="6-22/2"
+ENV SCHEDULE_MINUTE="0"
+ENV TIMEZONE="UTC"
+ENV RUN_ON_STARTUP="false"
+
+# Go for launch with the scheduler!
+CMD ["python3", "scheduler.py"]

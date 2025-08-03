@@ -9,7 +9,8 @@ logging.basicConfig(level=logging.INFO,  # Change to INFO by default, DEBUG is t
 
 logger = logging.getLogger(__name__)
 
-if __name__ == '__main__':
+def main_process():
+    """Main processing function that can be called from scheduler or directly"""
     try:
         logger.info("Starting importrr application")
         config = Config()
@@ -34,4 +35,10 @@ if __name__ == '__main__':
     except Exception as e:
         logger.error(f"Fatal error in importrr application: {e}")
         logger.debug("Full traceback:", exc_info=True)
+        raise  # Re-raise for scheduler to handle
+
+if __name__ == '__main__':
+    try:
+        main_process()
+    except Exception:
         exit(1)
