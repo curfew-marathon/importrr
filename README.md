@@ -16,6 +16,22 @@ importrr is a Python application designed to automate importing of image and mov
 
 The configuration file is read from `/config/config.ini` (or `config.ini` in the current directory)
 
+## Sample config.ini
+
+Create a `config.ini` file in the root directory or in `/config/config.ini` with the following structure:
+
+```ini
+[global]
+album_dir = /path/to/albums
+archive_dir = /path/to/archives
+
+[home]
+import_dir = personal,photos
+
+[work]
+import_dir = corporate
+```
+
 ## File structure:
 
 ```ini
@@ -73,18 +89,24 @@ importrr uses APScheduler for intelligent job scheduling with built-in error han
 The easiest way to run importrr is with Docker:
 
 ```bash
-# Build the container
-docker build -t importrr .
+# Pull the pre-built image
+sudo docker pull curfewmarathon/importrr
 
 # Run with volume mounts for your config and photos
 docker run -d \
   -v /path/to/config:/config \
   -v /path/to/photos:/album \
   -v /path/to/archive:/archive \
-  importrr
+  curfewmarathon/importrr
 ```
 
 The container will start the scheduler automatically and run every 2 hours.
+
+### Building from source (optional):
+
+```bash
+# Build the container locally
+docker build -t importrr .
 
 ## Local Development
 
