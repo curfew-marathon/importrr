@@ -14,10 +14,6 @@ importrr is a Python application designed to automate importing of image and mov
 
 # Configuration
 
-The configuration file is read from `/config/config.ini` (or `config.ini` in the current directory)
-
-## Sample config.ini
-
 Create a `config.ini` file in the root directory or in `/config/config.ini` with the following structure:
 
 ```ini
@@ -32,35 +28,24 @@ import_dir = personal,photos
 import_dir = corporate
 ```
 
-## File structure:
+## Configuration Parameters
 
-```ini
-[global]
-album_dir = /album
-archive_dir = /archive
+- **album_dir**: Root directory for album storage (e.g., `/path/to/albums`)
+- **archive_dir**: Root directory for archive storage (e.g., `/path/to/archives`)
+- **import_dir**: Comma-separated list of subdirectories to monitor for importing
 
-[folder1]
-import_dir = import1
+## How it works:
 
-[folder2]
-import_dir = import2,import3
-```
+The `global` section defines the root directories. Each additional section (like `[home]` or `[work]`) creates a separate processing area:
 
-The `global` section outlines the root folders which apply to each of the sections. The `[section]` will be appended to the root folders and the images will be pulled in from the `import_dir` directories. The `import_dir` can support multiple values separated by a comma.
-
-## Example:
-
-In the configuration above for `folder1`, the images will be imported from `/album/folder1/import1`, renamed and sorted into `/album/folder1/yyyy/mm/yyyymmdd-hhmmss-c.ext` and a tar of the images placed in `/archive/folder1/yyyymmdd-hhmmss-c.tar`
-
-For `folder2`, there will be two iterations:
-1. Images from `/album/folder2/import2` → sorted into `/album/folder2/yyyy/mm/` → archived to `/archive/folder2/`
-2. Images from `/album/folder2/import3` → sorted into `/album/folder2/yyyy/mm/` → archived to `/archive/folder2/`
+- Images from `/path/to/albums/home/personal` and `/path/to/albums/home/photos` → sorted into `/path/to/albums/home/yyyy/mm/` → archived to `/path/to/archives/home/`
+- Images from `/path/to/albums/work/corporate` → sorted into `/path/to/albums/work/yyyy/mm/` → archived to `/path/to/archives/work/`
 
 Using multiple import directories is handy when importing images from multiple devices which could potentially have naming collisions.
 
 ## Error handling:
 
-Image files which cannot be cleaned, are corrupted or have malformed EXIF data will be left in a timestamped directory of `import_dir`. Assuming the data can be manually fixed by the user, the image files can be placed back into the import directory for re-import.  
+Image files which cannot be cleaned, are corrupted or have malformed EXIF data will be left in a timestamped directory. Assuming the data can be manually fixed by the user, the image files can be placed back into the import directory for re-import.  
 
 # How it works
 
