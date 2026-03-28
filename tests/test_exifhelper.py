@@ -68,49 +68,18 @@ def test_adjust_screenshots_params(mock_run_exiftool):
 
     adjust_screenshots(import_dir, root_dir)
 
-    assert mock_run_exiftool.call_count == 3
+    assert mock_run_exiftool.call_count == 1
 
-    mock_run_exiftool.assert_any_call(
-        root_dir,
-        [
-            "-overwrite_original",
-            "-EXIF:DateTimeOriginal<PNG:CreateDate",
-            "-XMP:DateCreated<PNG:CreateDate",
-            "-if",
-            "not $datetimeoriginal",
-            "-ext",
-            "GIF",
-            "-ext",
-            "JPG",
-            "-ext",
-            "PNG",
-            import_dir,
-        ],
-    )
-
-    mock_run_exiftool.assert_any_call(
-        root_dir,
-        [
-            "-overwrite_original",
-            "-EXIF:DateTimeOriginal<XMP:DateCreated",
-            "-if",
-            "not $datetimeoriginal",
-            "-ext",
-            "GIF",
-            "-ext",
-            "JPG",
-            "-ext",
-            "PNG",
-            import_dir,
-        ],
-    )
-
-    mock_run_exiftool.assert_any_call(
+    mock_run_exiftool.assert_called_once_with(
         root_dir,
         [
             "-overwrite_original",
             "-EXIF:DateTimeOriginal<FileModifyDate",
             "-XMP:DateCreated<FileModifyDate",
+            "-EXIF:DateTimeOriginal<XMP:DateCreated",
+            "-XMP:DateCreated<XMP:DateCreated",
+            "-EXIF:DateTimeOriginal<PNG:CreateDate",
+            "-XMP:DateCreated<PNG:CreateDate",
             "-if",
             "not $datetimeoriginal",
             "-ext",
