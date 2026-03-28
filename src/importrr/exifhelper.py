@@ -68,22 +68,12 @@ def adjust_screenshots(import_dir, root_dir):
     # if there is any date in the metadata then add it in
     params = [
         "-overwrite_original",
-        "-EXIF:DateTimeOriginal<PNG:CreateDate",
-        "-XMP:DateCreated<PNG:CreateDate",
-    ] + common_params
-    run_exiftool(root_dir, params)
-
-    params = [
-        "-overwrite_original",
-        "-EXIF:DateTimeOriginal<XMP:DateCreated",
-    ] + common_params
-    run_exiftool(root_dir, params)
-
-    # for everything that's left just use the file modify date
-    params = [
-        "-overwrite_original",
         "-EXIF:DateTimeOriginal<FileModifyDate",
         "-XMP:DateCreated<FileModifyDate",
+        "-EXIF:DateTimeOriginal<XMP:DateCreated",
+        "-XMP:DateCreated<XMP:DateCreated",
+        "-EXIF:DateTimeOriginal<PNG:CreateDate",
+        "-XMP:DateCreated<PNG:CreateDate",
     ] + common_params
     run_exiftool(root_dir, params)
 
