@@ -9,14 +9,11 @@ from apscheduler.triggers.cron import CronTrigger
 from importrr.config import Config
 from importrr.sort import Sort
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s %(levelname)-8s [%(name)s] %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
-)
+logging.basicConfig(level=logging.INFO,
+                    format='%(asctime)s %(levelname)-8s [%(name)s] %(message)s',
+                    datefmt='%Y-%m-%d %H:%M:%S')
 
 logger = logging.getLogger(__name__)
-
 
 def main_process():
     """Main processing function that can be called from scheduler or directly"""
@@ -29,11 +26,9 @@ def main_process():
 
         for i, d in enumerate(config.get_data(), 1):
             try:
-                logger.info(
-                    f"Processing section {i}/{total_sections}: {d.get('album')}"
-                )
-                sort = Sort(d.get("album"), d.get("archive"))
-                for import_dir in d.get("import"):
+                logger.info(f"Processing section {i}/{total_sections}: {d.get('album')}")
+                sort = Sort(d.get('album'), d.get('archive'))
+                for import_dir in d.get('import'):
                     sort.launch(import_dir)
             except Exception as e:
                 logger.error(f"Failed to process section {i}: {e}")
@@ -48,7 +43,6 @@ def main_process():
         logger.debug("Full traceback:", exc_info=True)
         raise  # Re-raise for scheduler to handle
 
-
 class ImportrrScheduler:
     def __init__(self):
         self.scheduler = BlockingScheduler()
@@ -56,7 +50,6 @@ class ImportrrScheduler:
 
     def setup_signal_handlers(self):
         """Setup graceful shutdown handlers"""
-
         def signal_handler(signum, frame):
             logger.info(f"Received signal {signum}, shutting down gracefully...")
             self.scheduler.shutdown()
@@ -99,18 +92,16 @@ class ImportrrScheduler:
             # Add the job - every 2 hours from 8 AM to 10 PM
             self.scheduler.add_job(
                 func=self.run_import_job,
-                trigger=CronTrigger(minute=0, hour="8-22/2"),
-                id="import_job",
-                name="Import Media Files",
+                trigger=CronTrigger(minute=0, hour='8-22/2'),
+                id='import_job',
+                name='Import Media Files',
                 misfire_grace_time=300,  # 5 minutes grace period
                 coalesce=True,  # If multiple jobs are queued, run only the latest
-                max_instances=1,  # Only one instance at a time
+                max_instances=1  # Only one instance at a time
             )
 
             logger.info("Importrr scheduler started (every 2 hours from 8 AM to 10 PM)")
-            logger.info(
-                "Scheduler configured with max_instances=1 to prevent overlapping jobs"
-            )
+            logger.info("Scheduler configured with max_instances=1 to prevent overlapping jobs")
 
             # Run once on startup
             logger.info("Running initial import on startup...")
@@ -127,8 +118,7 @@ class ImportrrScheduler:
             logger.debug("Full traceback:", exc_info=True)
             sys.exit(1)
 
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     logger.info("Starting importrr scheduler service")
     scheduler = ImportrrScheduler()
     scheduler.start()

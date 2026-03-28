@@ -2,12 +2,12 @@ import logging
 import os.path
 from configparser import ConfigParser
 
-CANDIDATES = ["config.ini", "/config/config.ini"]
+CANDIDATES = ['config.ini', '/config/config.ini']
 
 logger = logging.getLogger(__name__)
 
-
 class Config:
+
     def __init__(self):
         parser = ConfigParser()
 
@@ -24,16 +24,14 @@ class Config:
             logger.warning(f"No configuration file found in: {CANDIDATES}")
             raise FileNotFoundError(f"Configuration file not found in: {CANDIDATES}")
 
-        if "global" not in parser.sections():
+        if 'global' not in parser.sections():
             raise ValueError("Missing required 'global' section in configuration")
 
         try:
-            self.album_root = parser["global"]["album_dir"]
-            self.archive_root = parser["global"]["archive_dir"]
+            self.album_root = parser['global']['album_dir']
+            self.archive_root = parser['global']['archive_dir']
         except KeyError as e:
-            raise ValueError(
-                f"Missing required configuration field in 'global' section: {e}"
-            )
+            raise ValueError(f"Missing required configuration field in 'global' section: {e}")
 
         logger.info(f"Album root directory: {self.album_root}")
         logger.info(f"Archive root directory: {self.archive_root}")
@@ -41,42 +39,29 @@ class Config:
         self.data = []
 
         for section_name in parser.sections():
-            if "global" == section_name:
+            if 'global' == section_name:
                 continue
 
             logger.debug(f"Processing configuration section: {section_name}")
             album_dir = os.path.join(self.album_root, section_name)
 
             # Validate required fields for each section
-            if "import_dir" not in parser[section_name]:
-                raise ValueError(
-                    f"Missing required 'import_dir' field in section '{section_name}'"
-                )
+            if 'import_dir' not in parser[section_name]:
+                raise ValueError(f"Missing required 'import_dir' field in section '{section_name}'")
 
-            import_value = parser[section_name]["import_dir"].split(",")
+            import_value = parser[section_name]['import_dir'].split(',')
             # Strip whitespace from import directories
             import_value = [dir.strip() for dir in import_value if dir.strip()]
 
             if not import_value:
-                raise ValueError(
-                    f"Empty or invalid 'import_dir' field in section '{section_name}'"
-                )
+                raise ValueError(f"Empty or invalid 'import_dir' field in section '{section_name}'")
 
-            serial = parser[section_name].get(
-                "serial", None
-            )  # Use get() to avoid KeyError
+            serial = parser[section_name].get('serial', None)  # Use get() to avoid KeyError
             archive_dir = os.path.join(self.archive_root, section_name)
 
-            d = {
-                "album": album_dir,
-                "archive": archive_dir,
-                "import": import_value,
-                "serial": serial,
-            }
+            d = {'album': album_dir, 'archive': archive_dir, 'import': import_value, 'serial': serial}
             self.data.append(d)
-            logger.debug(
-                f"Added section: {section_name} with {len(import_value)} import directories"
-            )
+            logger.debug(f"Added section: {section_name} with {len(import_value)} import directories")
 
         logger.info(f"Configuration loaded successfully with {len(self.data)} sections")
 
@@ -91,6 +76,6 @@ class Config:
 
     def get_serial(self, d):
         for dict in self.data:
-            if d == dict.get("archive"):
-                return dict.get("serial")
+            if d == dict.get('archive'):
+                return dict.get('serial')
         raise KeyError("No serial for " + d)
