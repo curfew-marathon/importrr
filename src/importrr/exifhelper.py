@@ -52,36 +52,31 @@ def adjust_extensions(import_dir, root_dir):
 def adjust_screenshots(import_dir, root_dir):
     logger.info("Backfilling EXIF dates for screenshots and images")
     logger.debug(f"Processing files in: {import_dir}")
+
+    common_params = [
+        "-if",
+        "not $datetimeoriginal",
+        "-ext",
+        "GIF",
+        "-ext",
+        "JPG",
+        "-ext",
+        "PNG",
+        import_dir,
+    ]
+
     # if there is any date in the metadata then add it in
     params = [
         "-overwrite_original",
         "-EXIF:DateTimeOriginal<PNG:CreateDate",
         "-XMP:DateCreated<PNG:CreateDate",
-        "-if",
-        "not $datetimeoriginal",
-        "-ext",
-        "GIF",
-        "-ext",
-        "JPG",
-        "-ext",
-        "PNG",
-        import_dir,
-    ]
+    ] + common_params
     run_exiftool(root_dir, params)
 
     params = [
         "-overwrite_original",
         "-EXIF:DateTimeOriginal<XMP:DateCreated",
-        "-if",
-        "not $datetimeoriginal",
-        "-ext",
-        "GIF",
-        "-ext",
-        "JPG",
-        "-ext",
-        "PNG",
-        import_dir,
-    ]
+    ] + common_params
     run_exiftool(root_dir, params)
 
     # for everything that's left just use the file modify date
@@ -89,16 +84,7 @@ def adjust_screenshots(import_dir, root_dir):
         "-overwrite_original",
         "-EXIF:DateTimeOriginal<FileModifyDate",
         "-XMP:DateCreated<FileModifyDate",
-        "-if",
-        "not $datetimeoriginal",
-        "-ext",
-        "GIF",
-        "-ext",
-        "JPG",
-        "-ext",
-        "PNG",
-        import_dir,
-    ]
+    ] + common_params
     run_exiftool(root_dir, params)
 
 
