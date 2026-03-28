@@ -3,6 +3,9 @@ name: Docker Image CI
 on:
   push
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
 
   push_to_registry:
