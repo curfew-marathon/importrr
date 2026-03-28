@@ -17,7 +17,7 @@ jobs:
     steps:
 
       - name: check repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: run tests
         run: python3 -m unittest discover -s tests
