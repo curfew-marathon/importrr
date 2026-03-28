@@ -58,6 +58,7 @@ def test_backfill_video_tag_params(mock_run_exiftool, tag):
 
     mock_run_exiftool.assert_called_once_with(root_dir, expected_params)
 
+
 @patch("src.importrr.exifhelper.run_exiftool")
 def test_adjust_screenshots_params(mock_run_exiftool):
     import_dir = "/test/import/dir"
@@ -69,46 +70,55 @@ def test_adjust_screenshots_params(mock_run_exiftool):
 
     assert mock_run_exiftool.call_count == 3
 
-    mock_run_exiftool.assert_any_call(root_dir, [
-        "-overwrite_original",
-        "-EXIF:DateTimeOriginal<PNG:CreateDate",
-        "-XMP:DateCreated<PNG:CreateDate",
-        "-if",
-        "not $datetimeoriginal",
-        "-ext",
-        "GIF",
-        "-ext",
-        "JPG",
-        "-ext",
-        "PNG",
-        import_dir,
-    ])
+    mock_run_exiftool.assert_any_call(
+        root_dir,
+        [
+            "-overwrite_original",
+            "-EXIF:DateTimeOriginal<PNG:CreateDate",
+            "-XMP:DateCreated<PNG:CreateDate",
+            "-if",
+            "not $datetimeoriginal",
+            "-ext",
+            "GIF",
+            "-ext",
+            "JPG",
+            "-ext",
+            "PNG",
+            import_dir,
+        ],
+    )
 
-    mock_run_exiftool.assert_any_call(root_dir, [
-        "-overwrite_original",
-        "-EXIF:DateTimeOriginal<XMP:DateCreated",
-        "-if",
-        "not $datetimeoriginal",
-        "-ext",
-        "GIF",
-        "-ext",
-        "JPG",
-        "-ext",
-        "PNG",
-        import_dir,
-    ])
+    mock_run_exiftool.assert_any_call(
+        root_dir,
+        [
+            "-overwrite_original",
+            "-EXIF:DateTimeOriginal<XMP:DateCreated",
+            "-if",
+            "not $datetimeoriginal",
+            "-ext",
+            "GIF",
+            "-ext",
+            "JPG",
+            "-ext",
+            "PNG",
+            import_dir,
+        ],
+    )
 
-    mock_run_exiftool.assert_any_call(root_dir, [
-        "-overwrite_original",
-        "-EXIF:DateTimeOriginal<FileModifyDate",
-        "-XMP:DateCreated<FileModifyDate",
-        "-if",
-        "not $datetimeoriginal",
-        "-ext",
-        "GIF",
-        "-ext",
-        "JPG",
-        "-ext",
-        "PNG",
-        import_dir,
-    ])
+    mock_run_exiftool.assert_any_call(
+        root_dir,
+        [
+            "-overwrite_original",
+            "-EXIF:DateTimeOriginal<FileModifyDate",
+            "-XMP:DateCreated<FileModifyDate",
+            "-if",
+            "not $datetimeoriginal",
+            "-ext",
+            "GIF",
+            "-ext",
+            "JPG",
+            "-ext",
+            "PNG",
+            import_dir,
+        ],
+    )
