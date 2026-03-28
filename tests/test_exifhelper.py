@@ -1,4 +1,5 @@
 from unittest.mock import patch
+import pytest  # noqa: F401
 
 from src.importrr.exifhelper import adjust_extensions
 
