@@ -5,14 +5,14 @@ import ffmpy
 
 from importrr import exifhelper
 
-FFMPEG_PARAMS = '-c:v libx264 -preset slower -crf 20 -c:a aac -b:a 160k -vf format=yuv420p -movflags +faststart'
+FFMPEG_PARAMS = "-c:v libx264 -preset slower -crf 20 -c:a aac -b:a 160k -vf format=yuv420p -movflags +faststart"
 
 logger = logging.getLogger(__name__)
 
 
 def convert(root_dir, source_file):
     logger.info(f"Converting MOV to MP4: {source_file}")
-    result = source_file[:-3] + 'mp4'
+    result = source_file[:-3] + "mp4"
     output_file = os.path.join(root_dir, result)
     input_file = os.path.join(root_dir, source_file)
 
@@ -29,7 +29,9 @@ def convert(root_dir, source_file):
         # Get file sizes for logging
         input_size = os.path.getsize(input_file)
         output_size = os.path.getsize(output_file)
-        logger.info(f"Conversion successful: {source_file} ({input_size} bytes) -> {result} ({output_size} bytes)")
+        logger.info(
+            f"Conversion successful: {source_file} ({input_size} bytes) -> {result} ({output_size} bytes)"
+        )
 
         exifhelper.copy_tags(root_dir, input_file, output_file)
         return result
@@ -42,9 +44,7 @@ def transcode(input_file, output_file):
     logger.debug(f"Starting FFmpeg transcoding: {input_file} -> {output_file}")
     try:
         ff = ffmpy.FFmpeg(
-            inputs={input_file: '-y'},
-            outputs={
-                output_file: FFMPEG_PARAMS}
+            inputs={input_file: "-y"}, outputs={output_file: FFMPEG_PARAMS}
         )
         logger.debug(f"FFmpeg command: {ff.cmd}")
         ff.run()

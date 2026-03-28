@@ -31,10 +31,10 @@ def sort_media(root_dir, import_dir):
         if not split or not split.strip():  # Skip empty lines
             continue
 
-        index = split.find(' --> ')
+        index = split.find(" --> ")
         if index != -1:  # More pythonic comparison
             try:
-                s = split[index + 6:-1]
+                s = split[index + 6 : -1]
                 if s and s.strip():  # Only add non-empty results
                     result.append(s.strip())
             except IndexError:
@@ -98,9 +98,13 @@ def make_work_dir(cur_dir, work_dir, file_list):
         # Handle case where directory already exists
         if os.path.exists(work_dir):
             if os.path.isdir(work_dir):
-                logger.warning(f"Work directory already exists, using existing: {work_dir}")
+                logger.warning(
+                    f"Work directory already exists, using existing: {work_dir}"
+                )
             else:
-                raise OSError(f"Work directory path exists but is not a directory: {work_dir}")
+                raise OSError(
+                    f"Work directory path exists but is not a directory: {work_dir}"
+                )
         else:
             os.mkdir(work_dir)
 
@@ -130,7 +134,6 @@ def last_accessed(file):
 
 
 class Sort:
-
     def __init__(self, root_dir, archive_dir=None):
         if not os.path.isdir(root_dir):
             raise IOError("Directory doesn't exist " + root_dir)
@@ -143,7 +146,7 @@ class Sort:
         logger.info(f"Starting processing for import directory: {import_dir}")
         start = time.time()
         time_cutoff = start - 60 * TIME_CUTOFF
-        prefix = datetime.fromtimestamp(time_cutoff).strftime('%Y%m%d%H%M%S')
+        prefix = datetime.fromtimestamp(time_cutoff).strftime("%Y%m%d%H%M%S")
 
         import_dir = os.path.join(self.root_dir, import_dir)
         result = get_media_files(import_dir, time_cutoff)
@@ -156,7 +159,9 @@ class Sort:
 
             remaining_files = os.listdir(work_dir) if os.path.exists(work_dir) else []
             if remaining_files:
-                logger.warning(f"Unable to process {len(remaining_files)} files - they remain in {work_dir}")
+                logger.warning(
+                    f"Unable to process {len(remaining_files)} files - they remain in {work_dir}"
+                )
                 logger.debug(f"Remaining files: {remaining_files}")
             else:
                 logger.info("Successfully processed all files")
