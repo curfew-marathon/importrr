@@ -11,15 +11,17 @@ def organize(import_dir, root_dir):
     logger.info("Organizing files by date and renaming")
     logger.debug(f"Processing files in: {import_dir}")
     # verbose because we need to get the new names of the files
-    params = ['-verbose',
-              '-filename<${DateTimeOriginal#;DateFmt("%Y/%m")}/$DateTimeOriginal%-c.%e',
-              '-d',
-              '%Y%m%d-%H%M%S',
-              import_dir]
+    params = [
+        "-verbose",
+        '-filename<${DateTimeOriginal#;DateFmt("%Y/%m")}/$DateTimeOriginal%-c.%e',
+        "-d",
+        "%Y%m%d-%H%M%S",
+        import_dir,
+    ]
 
     output = run_exiftool(root_dir, params, False)
     # split string
-    splits = output.split('\n')
+    splits = output.split("\n")
     logger.debug(f"ExifTool returned {len(splits)} output lines")
     return splits
 
@@ -28,20 +30,22 @@ def adjust_extensions(import_dir, root_dir):
     logger.info("Adjusting file extensions based on MIME types")
     logger.debug(f"Processing files in: {import_dir}")
     # adjust the names of the files based on their MIME type so Exiftool doesn't error out
-    params = ['-filename<%f.$fileTypeExtension',
-              '-ext',
-              'GIF',
-              '-ext',
-              'JPG',
-              '-ext',
-              'PNG',
-              '-ext',
-              '3GP',
-              '-ext',
-              'MOV',
-              '-ext',
-              'MP4',
-              import_dir]
+    params = [
+        "-filename<%f.$fileTypeExtension",
+        "-ext",
+        "GIF",
+        "-ext",
+        "JPG",
+        "-ext",
+        "PNG",
+        "-ext",
+        "3GP",
+        "-ext",
+        "MOV",
+        "-ext",
+        "MP4",
+        import_dir,
+    ]
     run_exiftool(root_dir, params)
 
 
@@ -49,85 +53,97 @@ def adjust_screenshots(import_dir, root_dir):
     logger.info("Backfilling EXIF dates for screenshots and images")
     logger.debug(f"Processing files in: {import_dir}")
     # if there is any date in the metadata then add it in
-    params = ['-overwrite_original',
-              '-EXIF:DateTimeOriginal<PNG:CreateDate',
-              '-XMP:DateCreated<PNG:CreateDate',
-              '-if',
-              'not $datetimeoriginal',
-              '-ext',
-              'GIF',
-              '-ext',
-              'JPG',
-              '-ext',
-              'PNG',
-              import_dir]
+    params = [
+        "-overwrite_original",
+        "-EXIF:DateTimeOriginal<PNG:CreateDate",
+        "-XMP:DateCreated<PNG:CreateDate",
+        "-if",
+        "not $datetimeoriginal",
+        "-ext",
+        "GIF",
+        "-ext",
+        "JPG",
+        "-ext",
+        "PNG",
+        import_dir,
+    ]
     run_exiftool(root_dir, params)
 
-    params = ['-overwrite_original',
-              '-EXIF:DateTimeOriginal<XMP:DateCreated',
-              '-if',
-              'not $datetimeoriginal',
-              '-ext',
-              'GIF',
-              '-ext',
-              'JPG',
-              '-ext',
-              'PNG',
-              import_dir]
+    params = [
+        "-overwrite_original",
+        "-EXIF:DateTimeOriginal<XMP:DateCreated",
+        "-if",
+        "not $datetimeoriginal",
+        "-ext",
+        "GIF",
+        "-ext",
+        "JPG",
+        "-ext",
+        "PNG",
+        import_dir,
+    ]
     run_exiftool(root_dir, params)
 
     # for everything that's left just use the file modify date
-    params = ['-overwrite_original',
-              '-EXIF:DateTimeOriginal<FileModifyDate',
-              '-XMP:DateCreated<FileModifyDate',
-              '-if',
-              'not $datetimeoriginal',
-              '-ext',
-              'GIF',
-              '-ext',
-              'JPG',
-              '-ext',
-              'PNG',
-              import_dir]
+    params = [
+        "-overwrite_original",
+        "-EXIF:DateTimeOriginal<FileModifyDate",
+        "-XMP:DateCreated<FileModifyDate",
+        "-if",
+        "not $datetimeoriginal",
+        "-ext",
+        "GIF",
+        "-ext",
+        "JPG",
+        "-ext",
+        "PNG",
+        import_dir,
+    ]
     run_exiftool(root_dir, params)
 
 
 def copy_tags(root_dir, input_file, output_file):
     logger.debug(f"Copying EXIF tags: {input_file} -> {output_file}")
-    params = ['-overwrite_original',
-              '-TagsFromFile',
-              input_file,
-              '-all:all>all:all',
-              output_file]
+    params = [
+        "-overwrite_original",
+        "-TagsFromFile",
+        input_file,
+        "-all:all>all:all",
+        output_file,
+    ]
 
     run_exiftool(root_dir, params)
 
 
 def backfill_videos(import_dir, root_dir):
     logger.info("Backfilling video metadata dates")
-    backfill_video_tag(import_dir, root_dir, 'CreationDate')
-    backfill_video_tag(import_dir, root_dir, 'CreateDate')
+    backfill_video_tag(import_dir, root_dir, "CreationDate")
+    backfill_video_tag(import_dir, root_dir, "CreateDate")
 
 
 def backfill_video_tag(import_dir, root_dir, tag):
     logger.debug(f"Backfilling video dates using {tag} metadata")
-    params = ['-overwrite_original',
-              '-datetimeoriginal<' + tag,
-              '-time:all<$' + tag,
-              '-if',
-              'not $datetimeoriginal',
-              '-ext',
-              '3GP',
-              '-ext',
-              'MOV',
-              '-ext',
-              'MP4',
-              import_dir]
+    params = [
+        "-overwrite_original",
+        "-datetimeoriginal<" + tag,
+        "-time:all<$" + tag,
+        "-if",
+        "not $datetimeoriginal",
+        "-ext",
+        "3GP",
+        "-ext",
+        "MOV",
+        "-ext",
+        "MP4",
+        import_dir,
+    ]
     run_exiftool(root_dir, params)
 
 
 def run_exiftool(root_dir, params, on_error=True):
-    logger.debug(f"Running ExifTool with params: {' '.join(params[:3])}...")  # Show first few params
+    logger.debug(
+        f"Running ExifTool with params: {' '.join(params[:3])}..."
+    )  # Show first few params
     os.chdir(root_dir)
 
     try:
@@ -148,4 +164,6 @@ def run_exiftool(root_dir, params, on_error=True):
                 logger.error(f"ExifTool failed with return code {e.returncode}")
                 raise e
         else:
-            logger.warning(f"ExifTool returned non-zero exit code {e.returncode} but continuing")
+            logger.warning(
+                f"ExifTool returned non-zero exit code {e.returncode} but continuing"
+            )
