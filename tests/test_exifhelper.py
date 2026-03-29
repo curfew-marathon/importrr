@@ -30,6 +30,16 @@ def test_adjust_extensions_params(mock_run_exiftool):
 
     mock_run_exiftool.assert_called_once_with(root_dir, expected_params)
 
+    # Verify the exact params list, particularly that the right extensions are present
+    actual_params = mock_run_exiftool.call_args[0][1]
+    assert "-ext" in actual_params
+    assert "GIF" in actual_params
+    assert "JPG" in actual_params
+    assert "PNG" in actual_params
+    assert "3GP" in actual_params
+    assert "MOV" in actual_params
+    assert "MP4" in actual_params
+
 
 @patch("src.importrr.exifhelper.run_exiftool")
 @pytest.mark.parametrize("tag", ["CreationDate", "CreateDate"])
