@@ -7,6 +7,7 @@ from src.importrr.archive import copy, create_tar
 
 # --- Tests for copy ---
 
+
 @patch("src.importrr.archive.logger")
 def test_copy_no_files(mock_logger):
     copy("/test/root", [], "/test/archive", "test_prefix")
@@ -18,7 +19,9 @@ def test_copy_no_files(mock_logger):
 def test_copy_mov_conversion_failure(mock_logger, mock_convert):
     mock_convert.return_value = None
     copy("/test/root", ["video.mov"], "/test/archive", "test_prefix")
-    mock_logger.warning.assert_called_once_with("Skipping file due to MOV conversion failure")
+    mock_logger.warning.assert_called_once_with(
+        "Skipping file due to MOV conversion failure"
+    )
 
 
 @patch("src.importrr.archive.os.stat")
@@ -26,7 +29,9 @@ def test_copy_mov_conversion_failure(mock_logger, mock_convert):
 def test_copy_oserror_on_stat(mock_logger, mock_stat):
     mock_stat.side_effect = OSError("Access denied")
     copy("/test/root", ["image.jpg"], "/test/archive", "test_prefix")
-    mock_logger.error.assert_called_once_with("Cannot access file image.jpg: Access denied")
+    mock_logger.error.assert_called_once_with(
+        "Cannot access file image.jpg: Access denied"
+    )
 
 
 @patch("src.importrr.archive.create_tar")
@@ -90,6 +95,7 @@ def test_copy_create_multiple_tars(mock_stat, mock_create_tar):
 
 # --- Tests for create_tar ---
 
+
 @patch("src.importrr.archive.os.path.getsize")
 @patch("src.importrr.archive.os.path.exists")
 @patch("src.importrr.archive.tarfile.open")
@@ -125,7 +131,9 @@ def test_create_tar_success(mock_tarfile_open, mock_exists, mock_getsize):
 @patch("src.importrr.archive.os.path.getsize")
 @patch("src.importrr.archive.os.path.exists")
 @patch("src.importrr.archive.tarfile.open")
-def test_create_tar_file_not_found(mock_tarfile_open, mock_exists, mock_getsize, mock_logger):
+def test_create_tar_file_not_found(
+    mock_tarfile_open, mock_exists, mock_getsize, mock_logger
+):
     # first file exists, second does not
     mock_exists.side_effect = [True, False]
     mock_getsize.return_value = 1024
@@ -147,7 +155,9 @@ def test_create_tar_file_not_found(mock_tarfile_open, mock_exists, mock_getsize,
     )
 
     # logger should warn about file2
-    mock_logger.warning.assert_called_once_with("File not found for archiving: file2.jpg")
+    mock_logger.warning.assert_called_once_with(
+        "File not found for archiving: file2.jpg"
+    )
 
 
 @patch("src.importrr.archive.logger")
@@ -165,4 +175,6 @@ def test_create_tar_exception(mock_tarfile_open, mock_logger):
         create_tar(root_dir, sorted_files, archive_dir, prefix, index)
 
     expected_tar_file = os.path.join(archive_dir, f"{prefix}-{index}.tar")
-    mock_logger.error.assert_called_once_with(f"Failed to create archive {expected_tar_file}: Permission denied")
+    mock_logger.error.assert_called_once_with(
+        f"Failed to create archive {expected_tar_file}: Permission denied"
+    )
