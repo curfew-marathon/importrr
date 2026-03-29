@@ -90,7 +90,7 @@ class Config:
         return self.data
 
     def get_serial(self, d):
-        for dict in self.data:
-            if d == dict.get("archive"):
-                return dict.get("serial")
+        for item in self.data:
+            if d == item.get("archive"):
+                return item.get("serial")
         raise KeyError("No serial for " + d)
