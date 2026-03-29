@@ -33,8 +33,16 @@ def test_convert_success(mock_transcode, mock_exists, mock_getsize, mock_copy_ta
     result = convert(root_dir, source_file)
 
     assert result == "test_video.mp4"
-    mock_transcode.assert_called_once_with(os.path.join(root_dir, "test_video.mov"), os.path.join(root_dir, "test_video.mp4"))
-    mock_copy_tags.assert_called_once_with(root_dir, os.path.join(root_dir, "test_video.mov"), os.path.join(root_dir, "test_video.mp4"))
+    mock_transcode.assert_called_once_with(
+        os.path.join(root_dir, "test_video.mov"),
+        os.path.join(root_dir, "test_video.mp4"),
+    )
+    mock_copy_tags.assert_called_once_with(
+        root_dir,
+        os.path.join(root_dir, "test_video.mov"),
+        os.path.join(root_dir, "test_video.mp4"),
+    )
+
 
 @patch("src.importrr.transcode.os.path.exists")
 @patch("src.importrr.transcode.transcode")
@@ -47,7 +55,11 @@ def test_convert_output_not_created(mock_transcode, mock_exists):
     result = convert(root_dir, source_file)
 
     assert result is None
-    mock_transcode.assert_called_once_with(os.path.join(root_dir, "test_video.mov"), os.path.join(root_dir, "test_video.mp4"))
+    mock_transcode.assert_called_once_with(
+        os.path.join(root_dir, "test_video.mov"),
+        os.path.join(root_dir, "test_video.mp4"),
+    )
+
 
 @patch("src.importrr.transcode.os.path.exists")
 @patch("src.importrr.transcode.transcode")
@@ -61,4 +73,7 @@ def test_convert_exception(mock_transcode, mock_exists):
     result = convert(root_dir, source_file)
 
     assert result is None
-    mock_transcode.assert_called_once_with(os.path.join(root_dir, "test_video.mov"), os.path.join(root_dir, "test_video.mp4"))
+    mock_transcode.assert_called_once_with(
+        os.path.join(root_dir, "test_video.mov"),
+        os.path.join(root_dir, "test_video.mp4"),
+    )
