@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 def convert(root_dir, source_file):
     logger.info(f"Converting MOV to MP4: {source_file}")
-    result = source_file[:-3] + "mp4"
+    result = os.path.splitext(source_file)[0] + ".mp4"
     output_file = os.path.join(root_dir, result)
     input_file = os.path.join(root_dir, source_file)
 
