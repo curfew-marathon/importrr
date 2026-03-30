@@ -21,7 +21,13 @@ def mock_directories(tmp_path):
 @patch("src.importrr.sort.make_work_dir")
 @patch("src.importrr.sort.sort_media")
 @patch("src.importrr.sort.archive.copy")
-def test_launch_valid_import_dir(mock_copy, mock_sort_media, mock_make_work_dir, mock_get_media_files, mock_directories):
+def test_launch_valid_import_dir(
+    mock_copy,
+    mock_sort_media,
+    mock_make_work_dir,
+    mock_get_media_files,
+    mock_directories,
+):
     root_dir, archive_dir = mock_directories
     sort = Sort(str(root_dir), str(archive_dir))
 
@@ -40,7 +46,9 @@ def test_launch_valid_import_dir(mock_copy, mock_sort_media, mock_make_work_dir,
 
 @patch("src.importrr.sort.get_media_files")
 @patch("src.importrr.sort.logger")
-def test_launch_path_traversal_parent(mock_logger, mock_get_media_files, mock_directories):
+def test_launch_path_traversal_parent(
+    mock_logger, mock_get_media_files, mock_directories
+):
     root_dir, archive_dir = mock_directories
     sort = Sort(str(root_dir), str(archive_dir))
 
@@ -49,12 +57,16 @@ def test_launch_path_traversal_parent(mock_logger, mock_get_media_files, mock_di
 
     # Verify processing was blocked
     mock_get_media_files.assert_not_called()
-    mock_logger.error.assert_called_once_with("Path traversal attempt detected: ../outside")
+    mock_logger.error.assert_called_once_with(
+        "Path traversal attempt detected: ../outside"
+    )
 
 
 @patch("src.importrr.sort.get_media_files")
 @patch("src.importrr.sort.logger")
-def test_launch_path_traversal_absolute(mock_logger, mock_get_media_files, mock_directories):
+def test_launch_path_traversal_absolute(
+    mock_logger, mock_get_media_files, mock_directories
+):
     root_dir, archive_dir = mock_directories
     sort = Sort(str(root_dir), str(archive_dir))
 
@@ -68,7 +80,9 @@ def test_launch_path_traversal_absolute(mock_logger, mock_get_media_files, mock_
 
 @patch("src.importrr.sort.get_media_files")
 @patch("src.importrr.sort.logger")
-def test_launch_path_traversal_complex(mock_logger, mock_get_media_files, mock_directories):
+def test_launch_path_traversal_complex(
+    mock_logger, mock_get_media_files, mock_directories
+):
     root_dir, archive_dir = mock_directories
     sort = Sort(str(root_dir), str(archive_dir))
 
@@ -77,4 +91,6 @@ def test_launch_path_traversal_complex(mock_logger, mock_get_media_files, mock_d
 
     # Verify processing was blocked
     mock_get_media_files.assert_not_called()
-    mock_logger.error.assert_called_once_with("Path traversal attempt detected: images/../../outside")
+    mock_logger.error.assert_called_once_with(
+        "Path traversal attempt detected: images/../../outside"
+    )
