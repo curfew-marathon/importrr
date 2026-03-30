@@ -148,7 +148,14 @@ class Sort:
         time_cutoff = start - 60 * TIME_CUTOFF
         prefix = datetime.fromtimestamp(time_cutoff).strftime("%Y%m%d%H%M%S")
 
-        import_dir = os.path.join(self.root_dir, import_dir)
+        abs_root_dir = os.path.abspath(self.root_dir)
+        abs_import_dir = os.path.abspath(os.path.join(abs_root_dir, import_dir))
+
+        if os.path.commonpath([abs_root_dir, abs_import_dir]) != abs_root_dir:
+            logger.error(f"Path traversal attempt detected: {import_dir}")
+            return
+
+        import_dir = abs_import_dir
         result = get_media_files(import_dir, time_cutoff)
 
         if result:
