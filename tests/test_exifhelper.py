@@ -70,6 +70,29 @@ def test_backfill_video_tag_params(mock_run_exiftool, tag):
 
 
 @patch("src.importrr.exifhelper.run_exiftool")
+def test_organize_params(mock_run_exiftool):
+    import_dir = "/test/import/dir"
+    root_dir = "/test/root/dir"
+
+    mock_run_exiftool.return_value = "file1\nfile2\nfile3"
+
+    from src.importrr.exifhelper import organize
+
+    result = organize(import_dir, root_dir)
+
+    expected_params = [
+        "-verbose",
+        '-filename<${DateTimeOriginal#;DateFmt("%Y/%m")}/$DateTimeOriginal%-c.%e',
+        "-d",
+        "%Y%m%d-%H%M%S",
+        import_dir,
+    ]
+
+    mock_run_exiftool.assert_called_once_with(root_dir, expected_params, False)
+    assert result == ["file1", "file2", "file3"]
+
+
+@patch("src.importrr.exifhelper.run_exiftool")
 def test_adjust_screenshots_params(mock_run_exiftool):
     import_dir = "/test/import/dir"
     root_dir = "/test/root/dir"
