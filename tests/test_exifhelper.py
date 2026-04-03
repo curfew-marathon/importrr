@@ -125,6 +125,7 @@ def test_adjust_screenshots_params(mock_run_exiftool):
         ],
     )
 
+
 @patch("src.importrr.exifhelper.os.chdir")
 @patch("src.importrr.exifhelper.ExifToolHelper")
 @pytest.mark.parametrize(
@@ -148,7 +149,14 @@ def test_run_exiftool_error_handling(
     from src.importrr.exifhelper import run_exiftool
     from exiftool.exceptions import ExifToolExecuteError
 
-    error = ExifToolExecuteError("Test error")
+    # To support both the local mock ExifToolExecuteError which takes any args
+    # and the real pyexiftool which expects (status, cmd_stdout, cmd_stderr, params),
+    # we instantiate with multiple args or handle gracefully.
+    try:
+        error = ExifToolExecuteError(returncode, stdout, stderr, "-test")
+    except TypeError:
+        error = ExifToolExecuteError(returncode)
+
     error.returncode = returncode
     error.stdout = stdout
     error.stderr = stderr
