@@ -124,3 +124,42 @@ def test_adjust_screenshots_params(mock_run_exiftool):
             import_dir,
         ],
     )
+
+@patch("src.importrr.exifhelper.os.chdir")
+@patch("src.importrr.exifhelper.ExifToolHelper")
+@pytest.mark.parametrize(
+    "returncode, stdout, stderr, on_error, should_raise",
+    [
+        (2, None, None, True, False),
+        (1, " 0 image files read", "some error", True, False),
+        (1, "some normal output", None, True, True),
+        (1, " 0 image files read", None, False, True),
+    ],
+)
+def test_run_exiftool_error_handling(
+    mock_exiftool_helper,
+    mock_chdir,
+    returncode,
+    stdout,
+    stderr,
+    on_error,
+    should_raise,
+):
+    from src.importrr.exifhelper import run_exiftool
+    from exiftool.exceptions import ExifToolExecuteError
+
+    error = ExifToolExecuteError("Test error")
+    error.returncode = returncode
+    error.stdout = stdout
+    error.stderr = stderr
+
+    mock_context = mock_exiftool_helper.return_value.__enter__.return_value
+    mock_context.execute.side_effect = error
+
+    if should_raise:
+        with pytest.raises(ExifToolExecuteError):
+            run_exiftool("/test/root", ["-test"], on_error=on_error)
+    else:
+        run_exiftool("/test/root", ["-test"], on_error=on_error)
+
+    mock_chdir.assert_called_once_with("/test/root")
