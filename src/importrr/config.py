@@ -2,7 +2,15 @@ import logging
 import os.path
 from configparser import ConfigParser
 
-CANDIDATES = ["config.ini", "/config/config.ini"]
+# Get the absolute path of the project root
+# __file__ is src/importrr/config.py, so we go up two levels to reach the root
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+
+# Absolute path candidates for the configuration file
+CANDIDATES = [
+    os.path.join(PROJECT_ROOT, "config.ini"),
+    "/config/config.ini",
+]
 
 logger = logging.getLogger(__name__)
 
