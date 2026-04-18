@@ -1,4 +1,3 @@
-import os
 from unittest.mock import patch
 
 import pytest
@@ -48,7 +47,9 @@ def test_make_work_dir_existing_dir(mock_logger, mock_exists, mock_isdir, mock_r
         "Work directory already exists, using existing: /work"
     )
     # file1.jpg exists in target, so it should be skipped
-    mock_logger.warning.assert_any_call("Target file already exists, skipping: file1.jpg")
+    mock_logger.warning.assert_any_call(
+        "Target file already exists, skipping: file1.jpg"
+    )
     mock_rename.assert_called_once_with("/cur/file2.jpg", "/work/file2.jpg")
 
 
