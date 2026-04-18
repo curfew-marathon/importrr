@@ -130,7 +130,7 @@ def test_transcode_failure_no_output_file(mock_ffmpeg_class, mock_remove, mock_e
     mock_ffmpeg_class.return_value = mock_ffmpeg_instance
 
     # Setup FFRuntimeError
-    error = FFRuntimeError(cmd="ffmpeg", exit_code=1)
+    error = FFRuntimeError(cmd="ffmpeg", exit_code=1, stdout=None, stderr=None)
     mock_ffmpeg_instance.run.side_effect = error
 
     mock_exists.return_value = False

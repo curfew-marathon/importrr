@@ -13,7 +13,7 @@ class FFmpeg:
 
 
 class FFRuntimeError(Exception):
-    def __init__(self, cmd, exit_code, stdout=None, stderr=None):
+    def __init__(self, cmd, exit_code, stdout, stderr):
         self.cmd = cmd
         self.exit_code = exit_code
         self.stdout = stdout
