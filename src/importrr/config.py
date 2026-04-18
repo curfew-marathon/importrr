@@ -83,9 +83,6 @@ class Config:
     def get_album(self):
         return self.album_root
 
-    def get_archive(self):
-        return self.archive_root
-
     def get_data(self):
         return self.data
 
