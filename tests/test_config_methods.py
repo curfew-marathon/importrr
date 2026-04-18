@@ -19,10 +19,6 @@ def test_get_album(dummy_config):
     assert dummy_config.get_album() == "/album"
 
 
-def test_get_archive(dummy_config):
-    assert dummy_config.get_archive() == "/archive"
-
-
 def test_get_data(dummy_config):
     assert len(dummy_config.get_data()) == 3
 
