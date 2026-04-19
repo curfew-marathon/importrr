@@ -17,12 +17,15 @@ def test_sort_media_parses_only_valid_lines(
     mock_backfill_videos,
     mock_organize,
 ):
+    # Simulate the list returned by exifhelper.organize() (i.e. output.split("\n")).
+    # ExifTool wraps the target filename in single quotes; sort_media skips the
+    # opening quote via [index+6:] and removes the closing quote via [:-1].
     mock_organize.return_value = [
         "",
         "no arrow line",
-        "old --> _2024/01/photo1.jpg\n",
-        "blank -->   \n",
-        "new --> _2024/01/photo2.jpg\n",
+        "IMG_0001.JPG --> '2024/01/photo1.jpg'",
+        "IMG_0002.JPG -->    ",
+        "IMG_0003.JPG --> '2024/01/photo2.jpg'",
     ]
 
     result = sort_media("/root", "/import")
