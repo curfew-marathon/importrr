@@ -126,6 +126,58 @@ def test_adjust_screenshots_params(mock_run_exiftool):
     )
 
 
+@patch("src.importrr.exifhelper.run_exiftool")
+def test_copy_tags_params(mock_run_exiftool):
+    from src.importrr.exifhelper import copy_tags
+
+    copy_tags("/test/root", "/test/root/in.mov", "/test/root/out.mp4")
+
+    mock_run_exiftool.assert_called_once_with(
+        "/test/root",
+        [
+            "-overwrite_original",
+            "-TagsFromFile",
+            "/test/root/in.mov",
+            "-all:all>all:all",
+            "/test/root/out.mp4",
+        ],
+    )
+
+
+@patch("src.importrr.exifhelper.backfill_video_tag")
+def test_backfill_videos_calls_both_tags(mock_backfill_video_tag):
+    from src.importrr.exifhelper import backfill_videos
+
+    backfill_videos("/test/import", "/test/root")
+
+    assert mock_backfill_video_tag.call_count == 2
+    assert mock_backfill_video_tag.mock_calls[0].args == (
+        "/test/import",
+        "/test/root",
+        "CreationDate",
+    )
+    assert mock_backfill_video_tag.mock_calls[1].args == (
+        "/test/import",
+        "/test/root",
+        "CreateDate",
+    )
+
+
+@patch("src.importrr.exifhelper.os.chdir")
+@patch("src.importrr.exifhelper.ExifToolHelper")
+def test_run_exiftool_success(mock_exiftool_helper, mock_chdir):
+    from src.importrr.exifhelper import run_exiftool
+
+    mock_context = mock_exiftool_helper.return_value.__enter__.return_value
+    mock_context.execute.return_value = "ok"
+
+    result = run_exiftool("/test/root", ["-test"])
+
+    assert result == "ok"
+    mock_chdir.assert_called_once_with("/test/root")
+    mock_context.execute.assert_called_once_with("-test")
+
+
 @patch("src.importrr.exifhelper.os.chdir")
 @patch("src.importrr.exifhelper.ExifToolHelper")
 @pytest.mark.parametrize(
