@@ -12,6 +12,11 @@ def dummy_config():
         {"archive": "/archive/2", "serial": None},
         {"archive": "/archive/3"},
     ]
+    config._archive_to_serial = {
+        "/archive/1": "S123",
+        "/archive/2": None,
+        "/archive/3": None,
+    }
     return config
 
 
