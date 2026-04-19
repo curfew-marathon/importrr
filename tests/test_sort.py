@@ -111,15 +111,11 @@ def test_make_work_dir_existing_path_not_directory_raises(tmp_path):
         make_work_dir(str(cur_dir), str(invalid_work_path), ["a.jpg"])
 
 
-def test_last_accessed_uses_max_timestamp(monkeypatch):
-    stats = [
-        SimpleNamespace(st_ctime=1, st_mtime=0, st_atime=0),
-        SimpleNamespace(st_ctime=0, st_mtime=5, st_atime=0),
-        SimpleNamespace(st_ctime=0, st_mtime=0, st_atime=3),
-    ]
+def test_last_accessed_returns_max_of_timestamps(monkeypatch):
+    stat = SimpleNamespace(st_ctime=1, st_mtime=5, st_atime=7)
 
-    monkeypatch.setattr("src.importrr.sort.os.stat", lambda _: stats.pop(0))
-    assert last_accessed("/file") == 5
+    monkeypatch.setattr("src.importrr.sort.os.stat", lambda _: stat)
+    assert last_accessed("/file") == 7
 
 
 def test_sort_init_validates_directories(tmp_path):
