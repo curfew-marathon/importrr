@@ -20,9 +20,9 @@ def test_sort_media_parses_only_valid_lines(
     mock_organize.return_value = [
         "",
         "no arrow line",
-        "old --> 2024/01/photo1.jpg\n",
+        "old --> _2024/01/photo1.jpg\n",
         "blank -->   \n",
-        "new --> 2024/01/photo2.jpg\n",
+        "new --> _2024/01/photo2.jpg\n",
     ]
 
     result = sort_media("/root", "/import")
