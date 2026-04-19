@@ -39,6 +39,7 @@ class Config:
         logger.info(f"Archive root directory: {self.archive_root}")
 
         self.data = []
+        self._archive_to_serial = {}
 
         for section_name in parser.sections():
             if "global" == section_name:
@@ -74,6 +75,7 @@ class Config:
                 "serial": serial,
             }
             self.data.append(d)
+            self._archive_to_serial[archive_dir] = serial
             logger.debug(
                 f"Added section: {section_name} with {len(import_value)} import directories"
             )
@@ -87,7 +89,6 @@ class Config:
         return self.data
 
     def get_serial(self, d):
-        for item in self.data:
-            if d == item.get("archive"):
-                return item.get("serial")
+        if d in self._archive_to_serial:
+            return self._archive_to_serial[d]
         raise KeyError("No serial for " + d)
