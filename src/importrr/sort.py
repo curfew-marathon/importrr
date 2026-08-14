@@ -136,9 +136,9 @@ def last_accessed(file):
 class Sort:
     def __init__(self, root_dir, archive_dir=None):
         if not os.path.isdir(root_dir):
-            raise IOError("Directory doesn't exist " + root_dir)
+            raise OSError("Directory doesn't exist " + root_dir)
         if archive_dir is not None and not os.path.isdir(archive_dir):
-            raise IOError("Directory doesn't exist " + archive_dir)
+            raise OSError("Directory doesn't exist " + archive_dir)
         self.root_dir = root_dir
         self.archive_dir = archive_dir
 
@@ -146,7 +146,7 @@ class Sort:
         logger.info(f"Starting processing for import directory: {import_dir}")
         start = time.time()
         time_cutoff = start - 60 * TIME_CUTOFF
-        prefix = datetime.fromtimestamp(time_cutoff).strftime("%Y%m%d%H%M%S")
+        prefix = datetime.fromtimestamp(time_cutoff).strftime("%Y%m%d%H%M%S")  # noqa: DTZ006
 
         abs_root_dir = os.path.abspath(self.root_dir)
         abs_import_dir = os.path.abspath(os.path.join(abs_root_dir, import_dir))

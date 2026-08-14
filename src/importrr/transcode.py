@@ -35,7 +35,7 @@ def convert(root_dir, source_file):
 
         exifhelper.copy_tags(root_dir, input_file, output_file)
         return result
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.error(f"Failed to convert {source_file}: {e}")
         return None  # Return None to skip file if conversion fails
 
@@ -59,4 +59,4 @@ def transcode(input_file, output_file):
         if os.path.exists(output_file):
             os.remove(output_file)
             logger.debug(f"Removed failed output file: {output_file}")
-        raise e
+        raise

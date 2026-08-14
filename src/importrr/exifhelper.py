@@ -150,7 +150,7 @@ def run_exiftool(root_dir, params, on_error=True):
         if 1 == e.returncode:
             if (on_error and " 0 image files read" not in e.stdout) or not on_error:
                 logger.error(f"ExifTool failed with return code {e.returncode}")
-                raise e
+                raise
         else:
             logger.warning(
                 f"ExifTool returned non-zero exit code {e.returncode} but continuing"
