@@ -35,7 +35,7 @@ def main_process():
                 sort = Sort(d.get("album"), d.get("archive"))
                 for import_dir in d.get("import"):
                     sort.launch(import_dir)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.error(f"Failed to process section {i}: {e}")
                 logger.debug(f"Section details: {d}")
                 # Continue with next section instead of crashing
@@ -67,7 +67,7 @@ class ImportrrScheduler:
 
     def run_import_job(self):
         """Wrapper function to run the import process with proper logging"""
-        job_start = datetime.now()
+        job_start = datetime.now()  # noqa: DTZ005
         logger.info("=" * 60)
         logger.info(f"Starting scheduled import job at {job_start}")
         logger.info("=" * 60)
@@ -76,15 +76,15 @@ class ImportrrScheduler:
             # Run the main import process
             main_process()
 
-            job_end = datetime.now()
+            job_end = datetime.now()  # noqa: DTZ005
             duration = job_end - job_start
             logger.info("=" * 60)
             logger.info(f"Import job completed successfully at {job_end}")
             logger.info(f"Total duration: {duration}")
             logger.info("=" * 60)
 
-        except Exception as e:
-            job_end = datetime.now()
+        except Exception as e:  # noqa: BLE001
+            job_end = datetime.now()  # noqa: DTZ005
             duration = job_end - job_start
             logger.error("=" * 60)
             logger.error(f"Import job failed at {job_end}")

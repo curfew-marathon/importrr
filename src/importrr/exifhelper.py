@@ -66,14 +66,26 @@ def adjust_screenshots(import_dir, root_dir):
     ]
 
     # if there is any date in the metadata then add it in
+    # Three sequential calls enforce priority: PNG:CreateDate > XMP:DateCreated > FileModifyDate.
+    # Each call re-checks "not $datetimeoriginal" so later calls only run if earlier ones found nothing.
+    params = [
+        "-overwrite_original",
+        "-EXIF:DateTimeOriginal<PNG:CreateDate",
+        "-XMP:DateCreated<PNG:CreateDate",
+    ] + common_params
+    run_exiftool(root_dir, params)
+
+    params = [
+        "-overwrite_original",
+        "-EXIF:DateTimeOriginal<XMP:DateCreated",
+    ] + common_params
+    run_exiftool(root_dir, params)
+
+    # for everything that's left just use the file modify date
     params = [
         "-overwrite_original",
         "-EXIF:DateTimeOriginal<FileModifyDate",
         "-XMP:DateCreated<FileModifyDate",
-        "-EXIF:DateTimeOriginal<XMP:DateCreated",
-        "-XMP:DateCreated<XMP:DateCreated",
-        "-EXIF:DateTimeOriginal<PNG:CreateDate",
-        "-XMP:DateCreated<PNG:CreateDate",
     ] + common_params
     run_exiftool(root_dir, params)
 
@@ -138,7 +150,7 @@ def run_exiftool(root_dir, params, on_error=True):
         if 1 == e.returncode:
             if (on_error and " 0 image files read" not in e.stdout) or not on_error:
                 logger.error(f"ExifTool failed with return code {e.returncode}")
-                raise e
+                raise
         else:
             logger.warning(
                 f"ExifTool returned non-zero exit code {e.returncode} but continuing"

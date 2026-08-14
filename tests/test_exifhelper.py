@@ -1,4 +1,5 @@
-from unittest.mock import patch
+from unittest.mock import call, patch
+
 import pytest
 
 from src.importrr.exifhelper import adjust_extensions
@@ -101,28 +102,50 @@ def test_adjust_screenshots_params(mock_run_exiftool):
 
     adjust_screenshots(import_dir, root_dir)
 
-    assert mock_run_exiftool.call_count == 1
+    assert mock_run_exiftool.call_count == 3
 
-    mock_run_exiftool.assert_called_once_with(
-        root_dir,
+    common = [
+        "-if",
+        "not $datetimeoriginal",
+        "-ext",
+        "GIF",
+        "-ext",
+        "JPG",
+        "-ext",
+        "PNG",
+        import_dir,
+    ]
+
+    mock_run_exiftool.assert_has_calls(
         [
-            "-overwrite_original",
-            "-EXIF:DateTimeOriginal<FileModifyDate",
-            "-XMP:DateCreated<FileModifyDate",
-            "-EXIF:DateTimeOriginal<XMP:DateCreated",
-            "-XMP:DateCreated<XMP:DateCreated",
-            "-EXIF:DateTimeOriginal<PNG:CreateDate",
-            "-XMP:DateCreated<PNG:CreateDate",
-            "-if",
-            "not $datetimeoriginal",
-            "-ext",
-            "GIF",
-            "-ext",
-            "JPG",
-            "-ext",
-            "PNG",
-            import_dir,
+            call(
+                root_dir,
+                [
+                    "-overwrite_original",
+                    "-EXIF:DateTimeOriginal<PNG:CreateDate",
+                    "-XMP:DateCreated<PNG:CreateDate",
+                ]
+                + common,
+            ),
+            call(
+                root_dir,
+                [
+                    "-overwrite_original",
+                    "-EXIF:DateTimeOriginal<XMP:DateCreated",
+                ]
+                + common,
+            ),
+            call(
+                root_dir,
+                [
+                    "-overwrite_original",
+                    "-EXIF:DateTimeOriginal<FileModifyDate",
+                    "-XMP:DateCreated<FileModifyDate",
+                ]
+                + common,
+            ),
         ],
+        any_order=False,
     )
 
 
@@ -146,8 +169,9 @@ def test_run_exiftool_error_handling(
     on_error,
     should_raise,
 ):
-    from src.importrr.exifhelper import run_exiftool
     from exiftool.exceptions import ExifToolExecuteError
+
+    from src.importrr.exifhelper import run_exiftool
 
     # To support both the local mock ExifToolExecuteError which takes any args
     # and the real pyexiftool which expects (status, cmd_stdout, cmd_stderr, params),
