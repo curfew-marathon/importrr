@@ -11,22 +11,31 @@ MAX_SIZE = 1000000000
 
 
 def copy(root_dir, sorted_files, archive_dir, prefix):
+    """Transcode MOVs and roll every sorted file into .tar archives.
+
+    Returns True only if every entry was archived; False if any file was
+    skipped (failed MOV conversion or unreadable file), so the caller can
+    keep the batch's work_dir and manifest for recovery.
+    """
     if not sorted_files:
         logger.debug("No files to archive")
-        return
+        return True
 
     logger.info(f"Starting archive creation for {len(sorted_files)} files")
     index = 0
     size = 0
     files = []
+    failed = []
 
     for f in sorted_files:
         if f.endswith(".mov"):
             logger.debug(f"Converting MOV file: {f}")
-            f = transcode.convert(root_dir, f)
-            if f is None:
-                logger.warning("Skipping file due to MOV conversion failure")
+            converted = transcode.convert(root_dir, f)
+            if converted is None:
+                logger.warning(f"Skipping file due to MOV conversion failure: {f}")
+                failed.append(f)
                 continue  # Skip this file if conversion failed
+            f = converted
 
         file = os.path.join(root_dir, f)
         try:
@@ -34,6 +43,7 @@ def copy(root_dir, sorted_files, archive_dir, prefix):
             logger.debug(f"Adding file to archive: {f} ({file_size} bytes)")
         except OSError as e:
             logger.error(f"Cannot access file {f}: {e}")
+            failed.append(f)
             continue
 
         if not files:  # Check if list is empty instead of None
@@ -62,8 +72,15 @@ def copy(root_dir, sorted_files, archive_dir, prefix):
 
     logger.info(f"Archive creation completed - created {total_archives} archive(s)")
 
+    if failed:
+        logger.warning(
+            f"Archive incomplete: {len(failed)} file(s) not archived: {failed}"
+        )
+    return not failed
+
 
 def create_tar(root_dir, sorted_files, archive_dir, prefix, index):
+    """Write the given files into a single .tar at archive_dir/<prefix>-<index>.tar."""
     tar_file = os.path.join(archive_dir, prefix + "-" + str(index) + ".tar")
     logger.info(f"Creating archive: {tar_file} with {len(sorted_files)} files")
 

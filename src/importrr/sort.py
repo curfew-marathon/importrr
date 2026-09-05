@@ -72,15 +72,31 @@ def write_manifest(root_dir, work_dir, batch_id, entries):
 
     doc = {"batch_id": batch_id, "files": files}
     manifest_path = os.path.join(work_dir, MANIFEST_NAME)
+    tmp_path = f"{manifest_path}.tmp"
     try:
-        with open(manifest_path, "w", encoding="utf-8") as fh:
+        with open(tmp_path, "w", encoding="utf-8") as fh:
             yaml.safe_dump(doc, fh, default_flow_style=False, sort_keys=False)
+            fh.flush()
+            os.fsync(fh.fileno())
+        os.replace(tmp_path, manifest_path)
         logger.info(f"Wrote manifest with {len(files)} entries: {manifest_path}")
     except OSError as e:
         logger.warning(f"Failed to write manifest {manifest_path}: {e}")
+        # Don't leave a partial temp file behind: cleanup() would read it as
+        # leftover media and refuse to remove the work_dir.
+        try:
+            os.remove(tmp_path)
+        except OSError:
+            pass
 
 
 def sort_media(root_dir, import_dir):
+    """Run the ExifTool sort phase and return one entry per organized file.
+
+    Each entry is ``{"original_name": <name entering organize()>, "album_path":
+    <root-relative path it was moved to>}``, parsed from ExifTool's verbose
+    ``' --> '`` output.
+    """
     exifhelper.adjust_extensions(import_dir, root_dir)
     exifhelper.adjust_screenshots(import_dir, root_dir)
     exifhelper.backfill_videos(import_dir, root_dir)
@@ -209,6 +225,11 @@ class Sort:
         self.archive_dir = archive_dir
 
     def launch(self, import_dir):
+        """Sort a batch, write its manifest, archive it, then clean up.
+
+        Order is strict: sort -> write manifest -> transcode + archive ->
+        cleanup, and cleanup only runs after a fully successful archive.
+        """
         logger.info(f"Starting processing for import directory: {import_dir}")
         start = time.time()
         time_cutoff = start - 60 * TIME_CUTOFF
@@ -245,13 +266,24 @@ class Sort:
             if os.path.isdir(work_dir):
                 write_manifest(self.root_dir, work_dir, prefix, entries)
 
+            archive_complete = True
             if self.archive_dir is not None:
                 logger.info(f"Creating archive with {len(sorted_media)} files")
-                archive.copy(self.root_dir, sorted_media, self.archive_dir, prefix)
+                archive_complete = archive.copy(
+                    self.root_dir, sorted_media, self.archive_dir, prefix
+                )
 
-            # Safe cleanup runs only now, after transcoding and archiving have
-            # completed. It refuses to delete a work_dir that still holds media.
-            cleanup(work_dir)
+            # Safe cleanup runs only after a fully successful archive. On a
+            # partial failure the work_dir and its manifest are kept so the
+            # batch can be recovered. cleanup() also independently refuses to
+            # delete a work_dir that still holds media.
+            if archive_complete:
+                cleanup(work_dir)
+            else:
+                logger.warning(
+                    f"Archive incomplete - keeping {work_dir} and its manifest "
+                    f"for recovery"
+                )
         else:
             logger.info("No files found for processing")
 

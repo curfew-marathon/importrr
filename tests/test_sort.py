@@ -1,9 +1,15 @@
 import os
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import yaml
 
-from src.importrr.sort import MANIFEST_NAME, cleanup, sort_media, write_manifest
+from src.importrr.sort import (
+    MANIFEST_NAME,
+    Sort,
+    cleanup,
+    sort_media,
+    write_manifest,
+)
 
 # --- sort_media parsing ---
 
@@ -65,9 +71,97 @@ def test_write_manifest_shape(tmp_path):
     )
 
 
+def test_write_manifest_leaves_no_temp_file_on_success(tmp_path):
+    work_dir = tmp_path / "work"
+    work_dir.mkdir()
+
+    write_manifest(str(tmp_path), str(work_dir), "b", [])
+
+    assert (work_dir / MANIFEST_NAME).exists()
+    assert list(work_dir.iterdir()) == [work_dir / MANIFEST_NAME]
+
+
 def test_write_manifest_write_failure_is_swallowed(tmp_path):
-    # work_dir does not exist -> open() raises OSError, which must be caught
-    write_manifest(str(tmp_path), str(tmp_path / "missing"), "b", [])
+    # work_dir does not exist -> open() raises OSError, which must be caught,
+    # and no manifest or temp file is created.
+    missing = tmp_path / "missing"
+    write_manifest(str(tmp_path), str(missing), "b", [])
+    assert not missing.exists()
+
+
+# --- Sort.launch pipeline ordering ---
+
+
+@patch("src.importrr.sort.os.path.exists", return_value=False)
+@patch("src.importrr.sort.os.path.isdir", return_value=True)
+@patch("src.importrr.sort.cleanup")
+@patch("src.importrr.sort.archive.copy")
+@patch("src.importrr.sort.write_manifest")
+@patch("src.importrr.sort.sort_media")
+@patch("src.importrr.sort.make_work_dir")
+@patch("src.importrr.sort.get_media_files")
+def test_launch_pipeline_order(
+    mock_get_media_files,
+    mock_make_work_dir,
+    mock_sort_media,
+    mock_write_manifest,
+    mock_copy,
+    mock_cleanup,
+    _mock_isdir,
+    _mock_exists,
+    tmp_path,
+):
+    mock_get_media_files.return_value = ["a.jpg"]
+    mock_sort_media.return_value = [{"original_name": "a.jpg", "album_path": "a.jpg"}]
+    mock_copy.return_value = True
+
+    manager = Mock()
+    manager.attach_mock(mock_sort_media, "sort_media")
+    manager.attach_mock(mock_write_manifest, "write_manifest")
+    manager.attach_mock(mock_copy, "copy")
+    manager.attach_mock(mock_cleanup, "cleanup")
+
+    Sort(str(tmp_path), str(tmp_path)).launch("images")
+
+    assert [c[0] for c in manager.mock_calls] == [
+        "sort_media",
+        "write_manifest",
+        "copy",
+        "cleanup",
+    ]
+
+
+@patch("src.importrr.sort.logger")
+@patch("src.importrr.sort.os.path.exists", return_value=False)
+@patch("src.importrr.sort.os.path.isdir", return_value=True)
+@patch("src.importrr.sort.cleanup")
+@patch("src.importrr.sort.archive.copy")
+@patch("src.importrr.sort.write_manifest")
+@patch("src.importrr.sort.sort_media")
+@patch("src.importrr.sort.make_work_dir")
+@patch("src.importrr.sort.get_media_files")
+def test_launch_keeps_work_dir_when_archive_incomplete(
+    mock_get_media_files,
+    mock_make_work_dir,
+    mock_sort_media,
+    mock_write_manifest,
+    mock_copy,
+    mock_cleanup,
+    _mock_isdir,
+    _mock_exists,
+    mock_logger,
+    tmp_path,
+):
+    mock_get_media_files.return_value = ["a.jpg"]
+    mock_sort_media.return_value = [{"original_name": "a.jpg", "album_path": "a.jpg"}]
+    mock_copy.return_value = False
+
+    Sort(str(tmp_path), str(tmp_path)).launch("images")
+
+    mock_cleanup.assert_not_called()
+    assert any(
+        "Archive incomplete" in str(c.args[0]) for c in mock_logger.warning.mock_calls
+    )
 
 
 # --- cleanup ---

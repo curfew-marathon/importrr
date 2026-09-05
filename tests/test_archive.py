@@ -10,7 +10,7 @@ from src.importrr.archive import copy, create_tar
 
 @patch("src.importrr.archive.logger")
 def test_copy_no_files(mock_logger):
-    copy("/test/root", [], "/test/archive", "test_prefix")
+    assert copy("/test/root", [], "/test/archive", "test_prefix") is True
     mock_logger.debug.assert_called_once_with("No files to archive")
 
 
@@ -18,9 +18,10 @@ def test_copy_no_files(mock_logger):
 @patch("src.importrr.archive.logger")
 def test_copy_mov_conversion_failure(mock_logger, mock_convert):
     mock_convert.return_value = None
-    copy("/test/root", ["video.mov"], "/test/archive", "test_prefix")
-    mock_logger.warning.assert_called_once_with(
-        "Skipping file due to MOV conversion failure"
+    result = copy("/test/root", ["video.mov"], "/test/archive", "test_prefix")
+    assert result is False
+    mock_logger.warning.assert_any_call(
+        "Skipping file due to MOV conversion failure: video.mov"
     )
 
 
@@ -28,10 +29,24 @@ def test_copy_mov_conversion_failure(mock_logger, mock_convert):
 @patch("src.importrr.archive.logger")
 def test_copy_oserror_on_stat(mock_logger, mock_stat):
     mock_stat.side_effect = OSError("Access denied")
-    copy("/test/root", ["image.jpg"], "/test/archive", "test_prefix")
+    result = copy("/test/root", ["image.jpg"], "/test/archive", "test_prefix")
+    assert result is False
     mock_logger.error.assert_called_once_with(
         "Cannot access file image.jpg: Access denied"
     )
+
+
+@patch("src.importrr.archive.create_tar")
+@patch("src.importrr.archive.os.stat")
+def test_copy_returns_true_on_full_success(mock_stat, mock_create_tar):
+    mock_stat_obj = MagicMock()
+    mock_stat_obj.st_size = 1024
+    mock_stat.return_value = mock_stat_obj
+
+    result = copy("/test/root", ["a.jpg", "b.jpg"], "/test/archive", "test_prefix")
+
+    assert result is True
+    mock_create_tar.assert_called_once()
 
 
 @patch("src.importrr.archive.create_tar")
