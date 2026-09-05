@@ -10,7 +10,7 @@ from src.importrr.archive import copy, create_tar
 
 @patch("src.importrr.archive.logger")
 def test_copy_no_files(mock_logger):
-    copy("/test/root", [], "/test/archive", "test_prefix")
+    assert copy("/test/root", [], "/test/archive", "test_prefix") is True
     mock_logger.debug.assert_called_once_with("No files to archive")
 
 
@@ -18,9 +18,10 @@ def test_copy_no_files(mock_logger):
 @patch("src.importrr.archive.logger")
 def test_copy_mov_conversion_failure(mock_logger, mock_convert):
     mock_convert.return_value = None
-    copy("/test/root", ["video.mov"], "/test/archive", "test_prefix")
-    mock_logger.warning.assert_called_once_with(
-        "Skipping file due to MOV conversion failure"
+    result = copy("/test/root", ["video.mov"], "/test/archive", "test_prefix")
+    assert result is False
+    mock_logger.warning.assert_any_call(
+        "Skipping file due to MOV conversion failure: video.mov"
     )
 
 
@@ -28,9 +29,44 @@ def test_copy_mov_conversion_failure(mock_logger, mock_convert):
 @patch("src.importrr.archive.logger")
 def test_copy_oserror_on_stat(mock_logger, mock_stat):
     mock_stat.side_effect = OSError("Access denied")
-    copy("/test/root", ["image.jpg"], "/test/archive", "test_prefix")
+    result = copy("/test/root", ["image.jpg"], "/test/archive", "test_prefix")
+    assert result is False
     mock_logger.error.assert_called_once_with(
         "Cannot access file image.jpg: Access denied"
+    )
+
+
+@patch("src.importrr.archive.create_tar")
+@patch("src.importrr.archive.os.stat")
+def test_copy_returns_true_on_full_success(mock_stat, mock_create_tar):
+    mock_create_tar.return_value = []
+    mock_stat_obj = MagicMock()
+    mock_stat_obj.st_size = 1024
+    mock_stat.return_value = mock_stat_obj
+
+    result = copy("/test/root", ["a.jpg", "b.jpg"], "/test/archive", "test_prefix")
+
+    assert result is True
+    mock_create_tar.assert_called_once()
+
+
+@patch("src.importrr.archive.create_tar")
+@patch("src.importrr.archive.os.stat")
+@patch("src.importrr.archive.logger")
+def test_copy_returns_false_when_tar_member_missing(
+    mock_logger, mock_stat, mock_create_tar
+):
+    # File passes stat but vanishes before create_tar can add it.
+    mock_create_tar.return_value = ["b.jpg"]
+    mock_stat_obj = MagicMock()
+    mock_stat_obj.st_size = 1024
+    mock_stat.return_value = mock_stat_obj
+
+    result = copy("/test/root", ["a.jpg", "b.jpg"], "/test/archive", "test_prefix")
+
+    assert result is False
+    mock_logger.warning.assert_any_call(
+        "Archive incomplete: 1 file(s) not archived: ['b.jpg']"
     )
 
 
@@ -41,6 +77,7 @@ def test_copy_single_tar(mock_stat, mock_create_tar):
     mock_stat_obj = MagicMock()
     mock_stat_obj.st_size = 1024
     mock_stat.return_value = mock_stat_obj
+    mock_create_tar.return_value = []
 
     root_dir = "/test/root"
     sorted_files = ["image1.jpg", "image2.jpg"]
@@ -72,6 +109,7 @@ def test_copy_create_multiple_tars(mock_stat, mock_create_tar):
         mock_stat_objs.append(mock_obj)
 
     mock_stat.side_effect = mock_stat_objs
+    mock_create_tar.return_value = []
 
     root_dir = "/test/root"
     sorted_files = ["file1.jpg", "file2.jpg", "file3.jpg", "file4.jpg", "file5.jpg"]
@@ -113,7 +151,7 @@ def test_create_tar_success(mock_tarfile_open, mock_exists, mock_getsize):
     prefix = "test_prefix"
     index = 0
 
-    create_tar(root_dir, sorted_files, archive_dir, prefix, index)
+    assert create_tar(root_dir, sorted_files, archive_dir, prefix, index) == []
 
     expected_tar_file = os.path.join(archive_dir, f"{prefix}-{index}.tar")
 
@@ -147,17 +185,18 @@ def test_create_tar_file_not_found(
     prefix = "test_prefix"
     index = 0
 
-    create_tar(root_dir, sorted_files, archive_dir, prefix, index)
+    missing = create_tar(root_dir, sorted_files, archive_dir, prefix, index)
 
     # tar.add should only be called for file1
     mock_tar.add.assert_called_once_with(
         os.path.join(root_dir, "file1.jpg"), arcname="file1.jpg", recursive=False
     )
 
-    # logger should warn about file2
+    # logger should warn about file2, and it is reported back as missing
     mock_logger.warning.assert_called_once_with(
         "File not found for archiving: file2.jpg"
     )
+    assert missing == ["file2.jpg"]
 
 
 @patch("src.importrr.archive.logger")

@@ -3,6 +3,8 @@ import os
 import time
 from datetime import datetime
 
+import yaml
+
 from importrr import archive, exifhelper
 
 logger = logging.getLogger(__name__)
@@ -10,17 +12,91 @@ logger = logging.getLogger(__name__)
 # in minutes
 TIME_CUTOFF = 2
 
+# Write-Ahead Log written into the work_dir before the slow transcode/archive
+# phase so a crash leaves a durable record of the batch.
+MANIFEST_NAME = "manifest.yml"
+
 
 def cleanup(work_dir):
+    """Delete work_dir only when it holds nothing but (optionally) the manifest.
+
+    If any media files remain, leave the directory *and* the manifest untouched
+    for manual inspection / recovery.
+    """
+    if not os.path.isdir(work_dir):
+        logger.debug(f"Work directory already gone, nothing to clean up: {work_dir}")
+        return
+
     try:
-        logger.debug(f"Removing temporary directory: {work_dir}")
+        entries = os.listdir(work_dir)
+    except OSError as e:
+        logger.error(f"Failed to list directory {work_dir}: {e}")
+        return
+
+    leftovers = [e for e in entries if e != MANIFEST_NAME]
+    if leftovers:
+        logger.warning(
+            f"Work directory left intact for manual inspection/recovery "
+            f"({len(leftovers)} unprocessed file(s)): {work_dir}"
+        )
+        logger.debug(f"Unprocessed entries: {leftovers}")
+        return
+
+    try:
+        manifest_path = os.path.join(work_dir, MANIFEST_NAME)
+        if os.path.exists(manifest_path):
+            os.remove(manifest_path)
+            logger.debug(f"Removed manifest: {manifest_path}")
         os.rmdir(work_dir)
         logger.debug(f"Successfully removed directory: {work_dir}")
     except OSError as e:
         logger.error(f"Failed to remove directory {work_dir}: {e}")
 
 
+def write_manifest(root_dir, work_dir, batch_id, entries):
+    """Persist the batch (what is about to be transcoded and archived) as YAML.
+
+    A failure to write the manifest is logged but does not stop the pipeline.
+    """
+    files = []
+    for entry in entries:
+        album_rel = entry["album_path"]
+        album_abs = os.path.abspath(os.path.join(root_dir, album_rel))
+        item = {
+            "original_name": entry["original_name"],
+            "album_path": album_abs,
+        }
+        if album_abs.lower().endswith(".mov"):
+            item["transcoded_mp4_path"] = os.path.splitext(album_abs)[0] + ".mp4"
+        files.append(item)
+
+    doc = {"batch_id": batch_id, "files": files}
+    manifest_path = os.path.join(work_dir, MANIFEST_NAME)
+    tmp_path = f"{manifest_path}.tmp"
+    try:
+        with open(tmp_path, "w", encoding="utf-8") as fh:
+            yaml.safe_dump(doc, fh, default_flow_style=False, sort_keys=False)
+            fh.flush()
+            os.fsync(fh.fileno())
+        os.replace(tmp_path, manifest_path)
+        logger.info(f"Wrote manifest with {len(files)} entries: {manifest_path}")
+    except OSError as e:
+        logger.warning(f"Failed to write manifest {manifest_path}: {e}")
+        # Don't leave a partial temp file behind: cleanup() would read it as
+        # leftover media and refuse to remove the work_dir.
+        try:
+            os.remove(tmp_path)
+        except OSError:
+            pass
+
+
 def sort_media(root_dir, import_dir):
+    """Run the ExifTool sort phase and return one entry per organized file.
+
+    Each entry is ``{"original_name": <name entering organize()>, "album_path":
+    <root-relative path it was moved to>}``, parsed from ExifTool's verbose
+    ``' --> '`` output.
+    """
     exifhelper.adjust_extensions(import_dir, root_dir)
     exifhelper.adjust_screenshots(import_dir, root_dir)
     exifhelper.backfill_videos(import_dir, root_dir)
@@ -36,7 +112,13 @@ def sort_media(root_dir, import_dir):
             try:
                 s = split[index + 6 : -1]
                 if s and s.strip():  # Only add non-empty results
-                    result.append(s.strip())
+                    src = split[:index].strip().strip("'")
+                    result.append(
+                        {
+                            "original_name": os.path.basename(src),
+                            "album_path": s.strip(),
+                        }
+                    )
             except IndexError:
                 logger.warning(f"Failed to parse ExifTool output line: {split}")
                 continue
@@ -143,6 +225,11 @@ class Sort:
         self.archive_dir = archive_dir
 
     def launch(self, import_dir):
+        """Sort a batch, write its manifest, archive it, then clean up.
+
+        Order is strict: sort -> write manifest -> transcode + archive ->
+        cleanup, and cleanup only runs after a fully successful archive.
+        """
         logger.info(f"Starting processing for import directory: {import_dir}")
         start = time.time()
         time_cutoff = start - 60 * TIME_CUTOFF
@@ -162,7 +249,8 @@ class Sort:
             logger.info(f"Processing {len(result)} files")
             work_dir = os.path.join(import_dir, prefix)
             make_work_dir(import_dir, work_dir, result)
-            sorted_media = sort_media(self.root_dir, work_dir)  # Use work_dir directly
+            entries = sort_media(self.root_dir, work_dir)  # Use work_dir directly
+            sorted_media = [entry["album_path"] for entry in entries]
 
             remaining_files = os.listdir(work_dir) if os.path.exists(work_dir) else []
             if remaining_files:
@@ -172,11 +260,30 @@ class Sort:
                 logger.debug(f"Remaining files: {remaining_files}")
             else:
                 logger.info("Successfully processed all files")
-                cleanup(work_dir)
 
+            # Write-Ahead Log: record the batch before the slow, crash-prone
+            # transcode + archive phase so it can be recovered after a hard kill.
+            if os.path.isdir(work_dir):
+                write_manifest(self.root_dir, work_dir, prefix, entries)
+
+            archive_complete = True
             if self.archive_dir is not None:
                 logger.info(f"Creating archive with {len(sorted_media)} files")
-                archive.copy(self.root_dir, sorted_media, self.archive_dir, prefix)
+                archive_complete = archive.copy(
+                    self.root_dir, sorted_media, self.archive_dir, prefix
+                )
+
+            # Safe cleanup runs only after a fully successful archive. On a
+            # partial failure the work_dir and its manifest are kept so the
+            # batch can be recovered. cleanup() also independently refuses to
+            # delete a work_dir that still holds media.
+            if archive_complete:
+                cleanup(work_dir)
+            else:
+                logger.warning(
+                    f"Archive incomplete - keeping {work_dir} and its manifest "
+                    f"for recovery"
+                )
         else:
             logger.info("No files found for processing")
 
