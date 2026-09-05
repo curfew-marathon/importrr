@@ -33,7 +33,9 @@ def test_launch_valid_import_dir(
 
     # Mock return values
     mock_get_media_files.return_value = ["test.jpg"]
-    mock_sort_media.return_value = ["test.jpg"]
+    mock_sort_media.return_value = [
+        {"original_name": "test.jpg", "album_path": "test.jpg"}
+    ]
 
     # Valid relative path
     sort.launch("images")
