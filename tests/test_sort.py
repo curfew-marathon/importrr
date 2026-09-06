@@ -13,6 +13,14 @@ from src.importrr.sort import (
     write_manifest,
 )
 
+
+def _hist_count(histogram):
+    for sample in histogram.collect()[0].samples:
+        if sample.name.endswith("_count"):
+            return sample.value
+    return 0
+
+
 # --- sort_media parsing ---
 
 
@@ -218,17 +226,20 @@ def test_launch_counts_incomplete_when_archive_raises(
     before_incomplete = metrics.ARCHIVE_INCOMPLETE_TOTAL.labels(
         section=sort.section
     )._value.get()
+    before_batches = _hist_count(metrics.BATCH_DURATION_SECONDS)
 
     with pytest.raises(OSError, match="tar write failed"):
         sort.launch("images")
 
     # The exception propagates for recovery handling, but the batch is still
-    # counted as an incomplete archive and cleanup is skipped.
+    # counted as an incomplete archive, its duration is still recorded, and
+    # cleanup is skipped.
     mock_cleanup.assert_not_called()
     assert (
         metrics.ARCHIVE_INCOMPLETE_TOTAL.labels(section=sort.section)._value.get()
         == before_incomplete + 1
     )
+    assert _hist_count(metrics.BATCH_DURATION_SECONDS) == before_batches + 1
 
 
 # --- cleanup ---

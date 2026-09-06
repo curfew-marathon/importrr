@@ -80,6 +80,30 @@ def test_copy_records_archive_metrics(mock_stat, mock_create_tar):
 
 
 @patch("src.importrr.archive.create_tar")
+@patch("src.importrr.archive.os.stat")
+@patch("src.importrr.archive.MAX_SIZE", 1500)
+def test_copy_counts_early_archive_when_later_tar_raises(mock_stat, mock_create_tar):
+    # Two archives worth of files; the second create_tar blows up. The first
+    # archive was already written and must still be reflected in the metrics.
+    mock_stat_objs = []
+    for size in [1000, 1000, 1000]:
+        mock_obj = MagicMock()
+        mock_obj.st_size = size
+        mock_stat_objs.append(mock_obj)
+    mock_stat.side_effect = mock_stat_objs
+    mock_create_tar.side_effect = [([], 500), OSError("disk full")]
+
+    before_count = _archives_created("home")
+    before_bytes = _archived_bytes("home")
+
+    with pytest.raises(OSError, match="disk full"):
+        copy("/test/root", ["a.jpg", "b.jpg", "c.jpg"], "/test/archive", "p", "home")
+
+    assert _archives_created("home") == before_count + 1
+    assert _archived_bytes("home") == before_bytes + 500
+
+
+@patch("src.importrr.archive.create_tar")
 def test_copy_no_files_records_nothing(mock_create_tar):
     before_count = _archives_created("home")
     before_bytes = _archived_bytes("home")

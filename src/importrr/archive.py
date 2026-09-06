@@ -27,7 +27,6 @@ def copy(root_dir, sorted_files, archive_dir, prefix, section=None):
     logger.info(f"Starting archive creation for {len(sorted_files)} files")
     index = 0
     size = 0
-    archived_bytes = 0
     files = []
     failed = []
 
@@ -58,7 +57,10 @@ def copy(root_dir, sorted_files, archive_dir, prefix, section=None):
             logger.info(f"Archive size limit reached, creating archive {index}")
             missing, tar_size = create_tar(root_dir, files, archive_dir, prefix, index)
             failed.extend(missing)
-            archived_bytes += tar_size
+            # Record each archive as soon as it is written, so a later
+            # create_tar failure cannot erase archives that already exist.
+            metrics.ARCHIVES_CREATED_TOTAL.labels(section=section).inc()
+            metrics.ARCHIVED_BYTES_TOTAL.labels(section=section).inc(tar_size)
 
             # reset all the things
             index += 1
@@ -73,15 +75,13 @@ def copy(root_dir, sorted_files, archive_dir, prefix, section=None):
         logger.info(f"Creating final archive {index}")
         missing, tar_size = create_tar(root_dir, files, archive_dir, prefix, index)
         failed.extend(missing)
-        archived_bytes += tar_size
+        metrics.ARCHIVES_CREATED_TOTAL.labels(section=section).inc()
+        metrics.ARCHIVED_BYTES_TOTAL.labels(section=section).inc(tar_size)
         total_archives = index + 1
     else:
         total_archives = index  # No final archive was created
 
     logger.info(f"Archive creation completed - created {total_archives} archive(s)")
-
-    metrics.ARCHIVES_CREATED_TOTAL.labels(section=section).inc(total_archives)
-    metrics.ARCHIVED_BYTES_TOTAL.labels(section=section).inc(archived_bytes)
 
     if failed:
         logger.warning(
