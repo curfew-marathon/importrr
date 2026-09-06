@@ -59,6 +59,31 @@ def test_convert_success(mock_transcode, mock_exists, mock_getsize, mock_copy_ta
     assert metrics.TRANSCODE_OUTPUT_BYTES_TOTAL._value.get() == before_out + 512
 
 
+@patch("src.importrr.transcode.exifhelper.copy_tags")
+@patch("src.importrr.transcode.os.path.getsize")
+@patch("src.importrr.transcode.os.path.exists")
+@patch("src.importrr.transcode.transcode")
+def test_convert_counts_ffmpeg_bytes_even_when_copy_tags_fails(
+    mock_transcode, mock_exists, mock_getsize, mock_copy_tags
+):
+    mock_exists.side_effect = [True, True]
+    mock_getsize.side_effect = [1024, 512]
+    mock_copy_tags.side_effect = RuntimeError("exiftool blew up")
+
+    before_failure = _transcode_count("failure")
+    before_in = metrics.TRANSCODE_INPUT_BYTES_TOTAL._value.get()
+    before_out = metrics.TRANSCODE_OUTPUT_BYTES_TOTAL._value.get()
+
+    result = convert("/test/root", "test_video.mov")
+
+    # copy_tags failure makes the conversion a failure overall...
+    assert result is None
+    assert _transcode_count("failure") == before_failure + 1
+    # ...but ffmpeg already did the read/write work, so those bytes still count.
+    assert metrics.TRANSCODE_INPUT_BYTES_TOTAL._value.get() == before_in + 1024
+    assert metrics.TRANSCODE_OUTPUT_BYTES_TOTAL._value.get() == before_out + 512
+
+
 @patch("src.importrr.transcode.os.path.exists")
 @patch("src.importrr.transcode.transcode")
 def test_convert_output_not_created(mock_transcode, mock_exists):

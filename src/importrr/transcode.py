@@ -35,11 +35,13 @@ def convert(root_dir, source_file):
         logger.info(
             f"Conversion successful: {source_file} ({input_size} bytes) -> {result} ({output_size} bytes)"
         )
+        # ffmpeg has already read the input and written the output; record that
+        # work now, before the EXIF copy that could still fail.
+        metrics.TRANSCODE_INPUT_BYTES_TOTAL.inc(input_size)
+        metrics.TRANSCODE_OUTPUT_BYTES_TOTAL.inc(output_size)
 
         exifhelper.copy_tags(root_dir, input_file, output_file)
         metrics.TRANSCODE_TOTAL.labels(outcome="success").inc()
-        metrics.TRANSCODE_INPUT_BYTES_TOTAL.inc(input_size)
-        metrics.TRANSCODE_OUTPUT_BYTES_TOTAL.inc(output_size)
         return result
     except Exception as e:  # noqa: BLE001
         logger.error(f"Failed to convert {source_file}: {e}")

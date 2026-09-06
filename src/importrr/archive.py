@@ -44,7 +44,6 @@ def copy(root_dir, sorted_files, archive_dir, prefix, section=None):
         file = os.path.join(root_dir, f)
         try:
             file_size = os.stat(file).st_size
-            archived_bytes += file_size
             logger.debug(f"Adding file to archive: {f} ({file_size} bytes)")
         except OSError as e:
             logger.error(f"Cannot access file {f}: {e}")
@@ -57,7 +56,9 @@ def copy(root_dir, sorted_files, archive_dir, prefix, section=None):
             continue
         elif size + file_size > MAX_SIZE:
             logger.info(f"Archive size limit reached, creating archive {index}")
-            failed.extend(create_tar(root_dir, files, archive_dir, prefix, index))
+            missing, tar_size = create_tar(root_dir, files, archive_dir, prefix, index)
+            failed.extend(missing)
+            archived_bytes += tar_size
 
             # reset all the things
             index += 1
@@ -70,7 +71,9 @@ def copy(root_dir, sorted_files, archive_dir, prefix, section=None):
     # Clear the last tar
     if files:
         logger.info(f"Creating final archive {index}")
-        failed.extend(create_tar(root_dir, files, archive_dir, prefix, index))
+        missing, tar_size = create_tar(root_dir, files, archive_dir, prefix, index)
+        failed.extend(missing)
+        archived_bytes += tar_size
         total_archives = index + 1
     else:
         total_archives = index  # No final archive was created
@@ -90,8 +93,9 @@ def copy(root_dir, sorted_files, archive_dir, prefix, section=None):
 def create_tar(root_dir, sorted_files, archive_dir, prefix, index):
     """Write the given files into a single .tar at archive_dir/<prefix>-<index>.tar.
 
-    Returns the list of entries that could not be added because they were no
-    longer on disk, so the caller can treat the archive as incomplete.
+    Returns ``(missing, archive_size)``: the list of entries that could not be
+    added because they were no longer on disk (so the caller can treat the
+    archive as incomplete), and the size in bytes of the .tar that was written.
     """
     tar_file = os.path.join(archive_dir, prefix + "-" + str(index) + ".tar")
     logger.info(f"Creating archive: {tar_file} with {len(sorted_files)} files")
@@ -115,4 +119,4 @@ def create_tar(root_dir, sorted_files, archive_dir, prefix, index):
         logger.error(f"Failed to create archive {tar_file}: {e}")
         raise
 
-    return missing
+    return missing, archive_size

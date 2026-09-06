@@ -30,7 +30,7 @@ _SECONDS_BUCKETS = (
 JOB_RUNS_TOTAL = Counter(
     "importrr_job_runs_total",
     "Scheduled import job runs, by outcome",
-    ["outcome"],  # "success" | "error"
+    ["outcome"],  # "success" (all sections ok) | "partial" (some failed) | "error"
 )
 JOB_DURATION_SECONDS = Histogram(
     "importrr_job_duration_seconds",
@@ -39,7 +39,12 @@ JOB_DURATION_SECONDS = Histogram(
 )
 LAST_SUCCESS_TIMESTAMP = Gauge(
     "importrr_last_success_timestamp_seconds",
-    "Unix time the last import job completed successfully",
+    "Unix time the last import job completed with every section successful",
+)
+SECTION_FAILURES_TOTAL = Counter(
+    "importrr_section_failures_total",
+    "Config sections that raised during a job run",
+    ["section"],
 )
 
 # --- sort / batch phase -------------------------------------------------------
@@ -102,13 +107,13 @@ TRANSCODE_OUTPUT_BYTES_TOTAL = Counter(
 
 
 def start(port):
-    """Start the metrics HTTP server. Never raises: an invalid port, a
+    """Start the metrics HTTP server. Never raises: a bad port value, a
     collision, or any other startup failure is logged and swallowed so a
     metrics problem can never take the daemon down."""
     try:
         start_http_server(int(port))
         logger.info("Metrics server listening on :%s/metrics", port)
-    except (ValueError, OverflowError, OSError) as e:
+    except Exception as e:  # noqa: BLE001 - startup failures are explicitly non-fatal
         logger.error(
             "Could not start metrics server on port %r (%s) - continuing without metrics",
             port,

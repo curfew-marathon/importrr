@@ -77,14 +77,15 @@ transcode cost can be monitored.
 - `METRICS_ENABLED` (default `true`) - set to `0`/`false`/`no` to disable the server
 - `METRICS_PORT` (default `9201`) - port the `/metrics` server binds
 
-A metrics startup failure (port in use, invalid port) is logged and swallowed;
-it never stops the scheduler.
+Any metrics startup failure (port in use, bad port value, anything else) is
+logged and swallowed; it never stops the scheduler.
 
 | Metric | Type | Labels | Meaning |
 | --- | --- | --- | --- |
-| `importrr_job_runs_total` | counter | `outcome` | Scheduled job runs (`success`/`error`) |
+| `importrr_job_runs_total` | counter | `outcome` | Scheduled job runs (`success` = all sections ok, `partial` = some failed, `error` = run aborted) |
 | `importrr_job_duration_seconds` | histogram | | Time for one full job (all sections) |
-| `importrr_last_success_timestamp_seconds` | gauge | | Unix time of the last successful job |
+| `importrr_last_success_timestamp_seconds` | gauge | | Unix time of the last job where every section succeeded |
+| `importrr_section_failures_total` | counter | `section` | Config sections that raised during a job run |
 | `importrr_files_discovered_total` | counter | `section` | Media files found ready to process |
 | `importrr_files_organized_total` | counter | `section` | Files sorted into the album tree |
 | `importrr_workdir_leftover_files` | gauge | `section` | Files left in a work_dir after the last batch |
@@ -115,10 +116,15 @@ docker run -d \
   -v /path/to/config:/config \
   -v /path/to/photos:/album \
   -v /path/to/archive:/archive \
+  -p 9201:9201 \
   curfewmarathon/importrr
 ```
 
 The container will start the scheduler automatically and run every 2 hours.
+
+`-p 9201:9201` publishes the metrics endpoint (see [Metrics](#metrics)). If you
+set a custom `METRICS_PORT`, publish that port instead (`-p <port>:<port>`), or
+pass `-e METRICS_ENABLED=false` to turn the endpoint off and drop the `-p`.
 
 ### Building from source (optional):
 
