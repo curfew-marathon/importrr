@@ -277,9 +277,20 @@ class Sort:
             archive_complete = True
             if self.archive_dir is not None:
                 logger.info(f"Creating archive with {len(sorted_media)} files")
-                archive_complete = archive.copy(
-                    self.root_dir, sorted_media, self.archive_dir, prefix, self.section
-                )
+                try:
+                    archive_complete = archive.copy(
+                        self.root_dir,
+                        sorted_media,
+                        self.archive_dir,
+                        prefix,
+                        self.section,
+                    )
+                except Exception:
+                    # A tar or file-I/O error leaves the batch unarchived just
+                    # as a False return does; count it before it propagates so
+                    # the metric does not silently miss this path.
+                    metrics.ARCHIVE_INCOMPLETE_TOTAL.labels(section=self.section).inc()
+                    raise
 
             # Safe cleanup runs only after a fully successful archive. On a
             # partial failure the work_dir and its manifest are kept so the

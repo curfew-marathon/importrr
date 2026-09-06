@@ -1,6 +1,7 @@
 import os
 from unittest.mock import Mock, patch
 
+import pytest
 import yaml
 
 from importrr import metrics
@@ -184,6 +185,46 @@ def test_launch_keeps_work_dir_when_archive_incomplete(
     assert any(
         "Archive incomplete" in str(c.args[0]) for c in mock_logger.warning.mock_calls
     )
+    assert (
+        metrics.ARCHIVE_INCOMPLETE_TOTAL.labels(section=sort.section)._value.get()
+        == before_incomplete + 1
+    )
+
+
+@patch("src.importrr.sort.os.path.exists", return_value=False)
+@patch("src.importrr.sort.os.path.isdir", return_value=True)
+@patch("src.importrr.sort.cleanup")
+@patch("src.importrr.sort.archive.copy")
+@patch("src.importrr.sort.write_manifest")
+@patch("src.importrr.sort.sort_media")
+@patch("src.importrr.sort.make_work_dir")
+@patch("src.importrr.sort.get_media_files")
+def test_launch_counts_incomplete_when_archive_raises(
+    mock_get_media_files,
+    mock_make_work_dir,
+    mock_sort_media,
+    mock_write_manifest,
+    mock_copy,
+    mock_cleanup,
+    _mock_isdir,
+    _mock_exists,
+    tmp_path,
+):
+    mock_get_media_files.return_value = ["a.jpg"]
+    mock_sort_media.return_value = [{"original_name": "a.jpg", "album_path": "a.jpg"}]
+    mock_copy.side_effect = OSError("tar write failed")
+
+    sort = Sort(str(tmp_path), str(tmp_path))
+    before_incomplete = metrics.ARCHIVE_INCOMPLETE_TOTAL.labels(
+        section=sort.section
+    )._value.get()
+
+    with pytest.raises(OSError, match="tar write failed"):
+        sort.launch("images")
+
+    # The exception propagates for recovery handling, but the batch is still
+    # counted as an incomplete archive and cleanup is skipped.
+    mock_cleanup.assert_not_called()
     assert (
         metrics.ARCHIVE_INCOMPLETE_TOTAL.labels(section=sort.section)._value.get()
         == before_incomplete + 1
