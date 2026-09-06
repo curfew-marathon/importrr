@@ -1,4 +1,5 @@
 import logging
+import os
 import signal
 import sys
 from datetime import datetime
@@ -6,6 +7,7 @@ from datetime import datetime
 from apscheduler.schedulers.blocking import BlockingScheduler
 from apscheduler.triggers.cron import CronTrigger
 
+from importrr import metrics
 from importrr.config import Config
 from importrr.sort import Sort
 
@@ -32,7 +34,7 @@ def main_process():
                 logger.info(
                     f"Processing section {i}/{total_sections}: {d.get('album')}"
                 )
-                sort = Sort(d.get("album"), d.get("archive"))
+                sort = Sort(d.get("album"), d.get("archive"), d.get("section"))
                 for import_dir in d.get("import"):
                     sort.launch(import_dir)
             except Exception as e:  # noqa: BLE001
@@ -74,7 +76,11 @@ class ImportrrScheduler:
 
         try:
             # Run the main import process
-            main_process()
+            with metrics.JOB_DURATION_SECONDS.time():
+                main_process()
+
+            metrics.JOB_RUNS_TOTAL.labels(outcome="success").inc()
+            metrics.LAST_SUCCESS_TIMESTAMP.set_to_current_time()
 
             job_end = datetime.now()  # noqa: DTZ005
             duration = job_end - job_start
@@ -84,6 +90,8 @@ class ImportrrScheduler:
             logger.info("=" * 60)
 
         except Exception as e:  # noqa: BLE001
+            metrics.JOB_RUNS_TOTAL.labels(outcome="error").inc()
+
             job_end = datetime.now()  # noqa: DTZ005
             duration = job_end - job_start
             logger.error("=" * 60)
@@ -130,5 +138,7 @@ class ImportrrScheduler:
 
 if __name__ == "__main__":
     logger.info("Starting importrr scheduler service")
+    if os.getenv("METRICS_ENABLED", "true").lower() in ("1", "true", "yes"):
+        metrics.start(os.getenv("METRICS_PORT", "9201"))
     scheduler = ImportrrScheduler()
     scheduler.start()

@@ -2,3 +2,4 @@ ffmpy>=1.0.0
 pyexiftool>=0.5.6
 APScheduler>=3.11.3
 PyYAML>=6.0.3
+prometheus-client>=0.26.0

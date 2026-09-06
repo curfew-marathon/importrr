@@ -10,6 +10,7 @@ importrr is a Python application designed to automate importing of image and mov
 - **Intelligent file naming** with collision handling
 - **Archive creation** for backup purposes
 - **Built-in scheduler** runs every 2 hours automatically
+- **Prometheus metrics** endpoint for monitoring
 - **Docker support** for easy deployment
 
 # Configuration
@@ -66,6 +67,38 @@ importrr uses APScheduler for intelligent job scheduling with built-in error han
 - **Runs once immediately** on startup
 - **Automatic recovery** - failed jobs don't stop the scheduler
 - **Graceful shutdown** handling
+
+# Metrics
+
+importrr exposes Prometheus metrics over HTTP so job health, throughput and
+transcode cost can be monitored.
+
+- Endpoint: `http://<host>:9201/metrics`
+- `METRICS_ENABLED` (default `true`) - set to `0`/`false`/`no` to disable the server
+- `METRICS_PORT` (default `9201`) - port the `/metrics` server binds
+
+A metrics startup failure (port in use, invalid port) is logged and swallowed;
+it never stops the scheduler.
+
+| Metric | Type | Labels | Meaning |
+| --- | --- | --- | --- |
+| `importrr_job_runs_total` | counter | `outcome` | Scheduled job runs (`success`/`error`) |
+| `importrr_job_duration_seconds` | histogram | | Time for one full job (all sections) |
+| `importrr_last_success_timestamp_seconds` | gauge | | Unix time of the last successful job |
+| `importrr_files_discovered_total` | counter | `section` | Media files found ready to process |
+| `importrr_files_organized_total` | counter | `section` | Files sorted into the album tree |
+| `importrr_workdir_leftover_files` | gauge | `section` | Files left in a work_dir after the last batch |
+| `importrr_batch_duration_seconds` | histogram | | Time to process one import_dir batch |
+| `importrr_archives_created_total` | counter | `section` | Tar archives written |
+| `importrr_archived_bytes_total` | counter | `section` | Bytes written into tar archives |
+| `importrr_archive_incomplete_total` | counter | `section` | Batches whose archive had missing/failed files |
+| `importrr_transcode_total` | counter | `outcome` | MOV to MP4 conversions (`success`/`failure`) |
+| `importrr_transcode_duration_seconds` | histogram | | Time for one MOV to MP4 conversion |
+| `importrr_transcode_input_bytes_total` | counter | | Input bytes fed to ffmpeg |
+| `importrr_transcode_output_bytes_total` | counter | | Output bytes produced by ffmpeg |
+
+To scrape it from the standalone Prometheus stack, add a `job_name: importrr`
+target pointing at the Docker host on port 9201.
 
 # Usage
 

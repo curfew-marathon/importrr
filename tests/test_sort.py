@@ -3,6 +3,7 @@ from unittest.mock import Mock, patch
 
 import yaml
 
+from importrr import metrics
 from src.importrr.sort import (
     MANIFEST_NAME,
     Sort,
@@ -121,7 +122,15 @@ def test_launch_pipeline_order(
     manager.attach_mock(mock_copy, "copy")
     manager.attach_mock(mock_cleanup, "cleanup")
 
-    Sort(str(tmp_path), str(tmp_path)).launch("images")
+    sort = Sort(str(tmp_path), str(tmp_path))
+    before_discovered = metrics.FILES_DISCOVERED_TOTAL.labels(
+        section=sort.section
+    )._value.get()
+    before_organized = metrics.FILES_ORGANIZED_TOTAL.labels(
+        section=sort.section
+    )._value.get()
+
+    sort.launch("images")
 
     assert [c[0] for c in manager.mock_calls] == [
         "sort_media",
@@ -129,6 +138,14 @@ def test_launch_pipeline_order(
         "copy",
         "cleanup",
     ]
+    assert (
+        metrics.FILES_DISCOVERED_TOTAL.labels(section=sort.section)._value.get()
+        == before_discovered + 1
+    )
+    assert (
+        metrics.FILES_ORGANIZED_TOTAL.labels(section=sort.section)._value.get()
+        == before_organized + 1
+    )
 
 
 @patch("src.importrr.sort.logger")
@@ -156,11 +173,20 @@ def test_launch_keeps_work_dir_when_archive_incomplete(
     mock_sort_media.return_value = [{"original_name": "a.jpg", "album_path": "a.jpg"}]
     mock_copy.return_value = False
 
-    Sort(str(tmp_path), str(tmp_path)).launch("images")
+    sort = Sort(str(tmp_path), str(tmp_path))
+    before_incomplete = metrics.ARCHIVE_INCOMPLETE_TOTAL.labels(
+        section=sort.section
+    )._value.get()
+
+    sort.launch("images")
 
     mock_cleanup.assert_not_called()
     assert any(
         "Archive incomplete" in str(c.args[0]) for c in mock_logger.warning.mock_calls
+    )
+    assert (
+        metrics.ARCHIVE_INCOMPLETE_TOTAL.labels(section=sort.section)._value.get()
+        == before_incomplete + 1
     )
 
 

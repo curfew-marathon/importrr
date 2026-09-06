@@ -2,7 +2,7 @@ import logging
 import os
 import tarfile
 
-from importrr import transcode
+from importrr import metrics, transcode
 
 logger = logging.getLogger(__name__)
 
@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 MAX_SIZE = 1000000000
 
 
-def copy(root_dir, sorted_files, archive_dir, prefix):
+def copy(root_dir, sorted_files, archive_dir, prefix, section=None):
     """Transcode MOVs and roll every sorted file into .tar archives.
 
     Returns True only if every entry was archived; False if any file was
@@ -18,6 +18,8 @@ def copy(root_dir, sorted_files, archive_dir, prefix):
     before it could be added to the tar), so the caller can keep the batch's
     work_dir and manifest for recovery.
     """
+    section = section or "unknown"
+
     if not sorted_files:
         logger.debug("No files to archive")
         return True
@@ -25,6 +27,7 @@ def copy(root_dir, sorted_files, archive_dir, prefix):
     logger.info(f"Starting archive creation for {len(sorted_files)} files")
     index = 0
     size = 0
+    archived_bytes = 0
     files = []
     failed = []
 
@@ -41,6 +44,7 @@ def copy(root_dir, sorted_files, archive_dir, prefix):
         file = os.path.join(root_dir, f)
         try:
             file_size = os.stat(file).st_size
+            archived_bytes += file_size
             logger.debug(f"Adding file to archive: {f} ({file_size} bytes)")
         except OSError as e:
             logger.error(f"Cannot access file {f}: {e}")
@@ -72,6 +76,9 @@ def copy(root_dir, sorted_files, archive_dir, prefix):
         total_archives = index  # No final archive was created
 
     logger.info(f"Archive creation completed - created {total_archives} archive(s)")
+
+    metrics.ARCHIVES_CREATED_TOTAL.labels(section=section).inc(total_archives)
+    metrics.ARCHIVED_BYTES_TOTAL.labels(section=section).inc(archived_bytes)
 
     if failed:
         logger.warning(

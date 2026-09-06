@@ -5,7 +5,7 @@ from datetime import datetime
 
 import yaml
 
-from importrr import archive, exifhelper
+from importrr import archive, exifhelper, metrics
 
 logger = logging.getLogger(__name__)
 
@@ -216,13 +216,16 @@ def last_accessed(file):
 
 
 class Sort:
-    def __init__(self, root_dir, archive_dir=None):
+    def __init__(self, root_dir, archive_dir=None, section=None):
         if not os.path.isdir(root_dir):
             raise OSError("Directory doesn't exist " + root_dir)
         if archive_dir is not None and not os.path.isdir(archive_dir):
             raise OSError("Directory doesn't exist " + archive_dir)
         self.root_dir = root_dir
         self.archive_dir = archive_dir
+        # Label value for per-section metrics. Falls back to the album folder
+        # name for callers that construct Sort directly (e.g. tests).
+        self.section = section or os.path.basename(os.path.normpath(root_dir))
 
     def launch(self, import_dir):
         """Sort a batch, write its manifest, archive it, then clean up.
@@ -244,6 +247,7 @@ class Sort:
 
         import_dir = abs_import_dir
         result = get_media_files(import_dir, time_cutoff)
+        metrics.FILES_DISCOVERED_TOTAL.labels(section=self.section).inc(len(result))
 
         if result:
             logger.info(f"Processing {len(result)} files")
@@ -251,8 +255,12 @@ class Sort:
             make_work_dir(import_dir, work_dir, result)
             entries = sort_media(self.root_dir, work_dir)  # Use work_dir directly
             sorted_media = [entry["album_path"] for entry in entries]
+            metrics.FILES_ORGANIZED_TOTAL.labels(section=self.section).inc(len(entries))
 
             remaining_files = os.listdir(work_dir) if os.path.exists(work_dir) else []
+            metrics.WORKDIR_LEFTOVER_FILES.labels(section=self.section).set(
+                len(remaining_files)
+            )
             if remaining_files:
                 logger.warning(
                     f"Unable to process {len(remaining_files)} files - they remain in {work_dir}"
@@ -270,7 +278,7 @@ class Sort:
             if self.archive_dir is not None:
                 logger.info(f"Creating archive with {len(sorted_media)} files")
                 archive_complete = archive.copy(
-                    self.root_dir, sorted_media, self.archive_dir, prefix
+                    self.root_dir, sorted_media, self.archive_dir, prefix, self.section
                 )
 
             # Safe cleanup runs only after a fully successful archive. On a
@@ -280,12 +288,15 @@ class Sort:
             if archive_complete:
                 cleanup(work_dir)
             else:
+                metrics.ARCHIVE_INCOMPLETE_TOTAL.labels(section=self.section).inc()
                 logger.warning(
                     f"Archive incomplete - keeping {work_dir} and its manifest "
                     f"for recovery"
                 )
         else:
+            metrics.WORKDIR_LEFTOVER_FILES.labels(section=self.section).set(0)
             logger.info("No files found for processing")
 
         elapsed = time.time() - start
+        metrics.BATCH_DURATION_SECONDS.observe(elapsed)
         logger.info(f"Completed processing {len(result)} files in {elapsed:.2f}s")

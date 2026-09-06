@@ -3,7 +3,17 @@ from unittest.mock import MagicMock, call, patch
 
 import pytest
 
+from importrr import metrics
 from src.importrr.archive import copy, create_tar
+
+
+def _archives_created(section):
+    return metrics.ARCHIVES_CREATED_TOTAL.labels(section=section)._value.get()
+
+
+def _archived_bytes(section):
+    return metrics.ARCHIVED_BYTES_TOTAL.labels(section=section)._value.get()
+
 
 # --- Tests for copy ---
 
@@ -48,6 +58,35 @@ def test_copy_returns_true_on_full_success(mock_stat, mock_create_tar):
 
     assert result is True
     mock_create_tar.assert_called_once()
+
+
+@patch("src.importrr.archive.create_tar")
+@patch("src.importrr.archive.os.stat")
+def test_copy_records_archive_metrics(mock_stat, mock_create_tar):
+    mock_create_tar.return_value = []
+    mock_stat_obj = MagicMock()
+    mock_stat_obj.st_size = 1024
+    mock_stat.return_value = mock_stat_obj
+
+    before_count = _archives_created("home")
+    before_bytes = _archived_bytes("home")
+
+    copy("/test/root", ["a.jpg", "b.jpg"], "/test/archive", "test_prefix", "home")
+
+    assert _archives_created("home") == before_count + 1
+    assert _archived_bytes("home") == before_bytes + 2048
+
+
+@patch("src.importrr.archive.create_tar")
+def test_copy_no_files_records_nothing(mock_create_tar):
+    before_count = _archives_created("home")
+    before_bytes = _archived_bytes("home")
+
+    assert copy("/test/root", [], "/test/archive", "test_prefix", "home") is True
+
+    mock_create_tar.assert_not_called()
+    assert _archives_created("home") == before_count
+    assert _archived_bytes("home") == before_bytes
 
 
 @patch("src.importrr.archive.create_tar")
