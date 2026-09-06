@@ -2,7 +2,7 @@ import logging
 import os
 import tarfile
 
-from importrr import transcode
+from importrr import metrics, transcode
 
 logger = logging.getLogger(__name__)
 
@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 MAX_SIZE = 1000000000
 
 
-def copy(root_dir, sorted_files, archive_dir, prefix):
+def copy(root_dir, sorted_files, archive_dir, prefix, section=None):
     """Transcode MOVs and roll every sorted file into .tar archives.
 
     Returns True only if every entry was archived; False if any file was
@@ -18,6 +18,8 @@ def copy(root_dir, sorted_files, archive_dir, prefix):
     before it could be added to the tar), so the caller can keep the batch's
     work_dir and manifest for recovery.
     """
+    section = section or "unknown"
+
     if not sorted_files:
         logger.debug("No files to archive")
         return True
@@ -53,7 +55,12 @@ def copy(root_dir, sorted_files, archive_dir, prefix):
             continue
         elif size + file_size > MAX_SIZE:
             logger.info(f"Archive size limit reached, creating archive {index}")
-            failed.extend(create_tar(root_dir, files, archive_dir, prefix, index))
+            missing, tar_size = create_tar(root_dir, files, archive_dir, prefix, index)
+            failed.extend(missing)
+            # Record each archive as soon as it is written, so a later
+            # create_tar failure cannot erase archives that already exist.
+            metrics.ARCHIVES_CREATED_TOTAL.labels(section=section).inc()
+            metrics.ARCHIVED_BYTES_TOTAL.labels(section=section).inc(tar_size)
 
             # reset all the things
             index += 1
@@ -66,7 +73,10 @@ def copy(root_dir, sorted_files, archive_dir, prefix):
     # Clear the last tar
     if files:
         logger.info(f"Creating final archive {index}")
-        failed.extend(create_tar(root_dir, files, archive_dir, prefix, index))
+        missing, tar_size = create_tar(root_dir, files, archive_dir, prefix, index)
+        failed.extend(missing)
+        metrics.ARCHIVES_CREATED_TOTAL.labels(section=section).inc()
+        metrics.ARCHIVED_BYTES_TOTAL.labels(section=section).inc(tar_size)
         total_archives = index + 1
     else:
         total_archives = index  # No final archive was created
@@ -83,8 +93,9 @@ def copy(root_dir, sorted_files, archive_dir, prefix):
 def create_tar(root_dir, sorted_files, archive_dir, prefix, index):
     """Write the given files into a single .tar at archive_dir/<prefix>-<index>.tar.
 
-    Returns the list of entries that could not be added because they were no
-    longer on disk, so the caller can treat the archive as incomplete.
+    Returns ``(missing, archive_size)``: the list of entries that could not be
+    added because they were no longer on disk (so the caller can treat the
+    archive as incomplete), and the size in bytes of the .tar that was written.
     """
     tar_file = os.path.join(archive_dir, prefix + "-" + str(index) + ".tar")
     logger.info(f"Creating archive: {tar_file} with {len(sorted_files)} files")
@@ -108,4 +119,4 @@ def create_tar(root_dir, sorted_files, archive_dir, prefix, index):
         logger.error(f"Failed to create archive {tar_file}: {e}")
         raise
 
-    return missing
+    return missing, archive_size

@@ -4,7 +4,12 @@ from unittest.mock import MagicMock, patch
 import pytest
 from ffmpy import FFRuntimeError
 
+from importrr import metrics
 from src.importrr.transcode import FFMPEG_PARAMS, convert, transcode
+
+
+def _transcode_count(outcome):
+    return metrics.TRANSCODE_TOTAL.labels(outcome=outcome)._value.get()
 
 
 @patch("src.importrr.transcode.transcode")
@@ -33,6 +38,10 @@ def test_convert_success(mock_transcode, mock_exists, mock_getsize, mock_copy_ta
     root_dir = "/test/root"
     source_file = "test_video.mov"
 
+    before_success = _transcode_count("success")
+    before_in = metrics.TRANSCODE_INPUT_BYTES_TOTAL._value.get()
+    before_out = metrics.TRANSCODE_OUTPUT_BYTES_TOTAL._value.get()
+
     result = convert(root_dir, source_file)
 
     assert result == "test_video.mp4"
@@ -45,6 +54,34 @@ def test_convert_success(mock_transcode, mock_exists, mock_getsize, mock_copy_ta
         os.path.join(root_dir, "test_video.mov"),
         os.path.join(root_dir, "test_video.mp4"),
     )
+    assert _transcode_count("success") == before_success + 1
+    assert metrics.TRANSCODE_INPUT_BYTES_TOTAL._value.get() == before_in + 1024
+    assert metrics.TRANSCODE_OUTPUT_BYTES_TOTAL._value.get() == before_out + 512
+
+
+@patch("src.importrr.transcode.exifhelper.copy_tags")
+@patch("src.importrr.transcode.os.path.getsize")
+@patch("src.importrr.transcode.os.path.exists")
+@patch("src.importrr.transcode.transcode")
+def test_convert_counts_ffmpeg_bytes_even_when_copy_tags_fails(
+    mock_transcode, mock_exists, mock_getsize, mock_copy_tags
+):
+    mock_exists.side_effect = [True, True]
+    mock_getsize.side_effect = [1024, 512]
+    mock_copy_tags.side_effect = RuntimeError("exiftool blew up")
+
+    before_failure = _transcode_count("failure")
+    before_in = metrics.TRANSCODE_INPUT_BYTES_TOTAL._value.get()
+    before_out = metrics.TRANSCODE_OUTPUT_BYTES_TOTAL._value.get()
+
+    result = convert("/test/root", "test_video.mov")
+
+    # copy_tags failure makes the conversion a failure overall...
+    assert result is None
+    assert _transcode_count("failure") == before_failure + 1
+    # ...but ffmpeg already did the read/write work, so those bytes still count.
+    assert metrics.TRANSCODE_INPUT_BYTES_TOTAL._value.get() == before_in + 1024
+    assert metrics.TRANSCODE_OUTPUT_BYTES_TOTAL._value.get() == before_out + 512
 
 
 @patch("src.importrr.transcode.os.path.exists")
@@ -73,9 +110,11 @@ def test_convert_exception(mock_transcode, mock_exists):
     root_dir = "/test/root"
     source_file = "test_video.mov"
 
+    before_failure = _transcode_count("failure")
     result = convert(root_dir, source_file)
 
     assert result is None
+    assert _transcode_count("failure") == before_failure + 1
     mock_transcode.assert_called_once_with(
         os.path.join(root_dir, "test_video.mov"),
         os.path.join(root_dir, "test_video.mp4"),

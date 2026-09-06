@@ -3,7 +3,7 @@ import os.path
 
 import ffmpy
 
-from importrr import exifhelper
+from importrr import exifhelper, metrics
 
 FFMPEG_PARAMS = "-c:v libx264 -preset slower -crf 20 -c:a aac -b:a 160k -vf format=yuv420p -movflags +faststart"
 
@@ -18,12 +18,15 @@ def convert(root_dir, source_file):
 
     if not os.path.exists(input_file):
         logger.error(f"Input file does not exist: {input_file}")
+        metrics.TRANSCODE_TOTAL.labels(outcome="failure").inc()
         return None  # Return None to skip file if conversion fails
 
     try:
-        transcode(input_file, output_file)
+        with metrics.TRANSCODE_DURATION_SECONDS.time():
+            transcode(input_file, output_file)
         if not os.path.exists(output_file):
             logger.error(f"Output file was not created: {output_file}")
+            metrics.TRANSCODE_TOTAL.labels(outcome="failure").inc()
             return None
 
         # Get file sizes for logging
@@ -32,11 +35,17 @@ def convert(root_dir, source_file):
         logger.info(
             f"Conversion successful: {source_file} ({input_size} bytes) -> {result} ({output_size} bytes)"
         )
+        # ffmpeg has already read the input and written the output; record that
+        # work now, before the EXIF copy that could still fail.
+        metrics.TRANSCODE_INPUT_BYTES_TOTAL.inc(input_size)
+        metrics.TRANSCODE_OUTPUT_BYTES_TOTAL.inc(output_size)
 
         exifhelper.copy_tags(root_dir, input_file, output_file)
+        metrics.TRANSCODE_TOTAL.labels(outcome="success").inc()
         return result
     except Exception as e:  # noqa: BLE001
         logger.error(f"Failed to convert {source_file}: {e}")
+        metrics.TRANSCODE_TOTAL.labels(outcome="failure").inc()
         return None  # Return None to skip file if conversion fails
 
 

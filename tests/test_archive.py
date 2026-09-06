@@ -3,7 +3,17 @@ from unittest.mock import MagicMock, call, patch
 
 import pytest
 
+from importrr import metrics
 from src.importrr.archive import copy, create_tar
+
+
+def _archives_created(section):
+    return metrics.ARCHIVES_CREATED_TOTAL.labels(section=section)._value.get()
+
+
+def _archived_bytes(section):
+    return metrics.ARCHIVED_BYTES_TOTAL.labels(section=section)._value.get()
+
 
 # --- Tests for copy ---
 
@@ -39,7 +49,7 @@ def test_copy_oserror_on_stat(mock_logger, mock_stat):
 @patch("src.importrr.archive.create_tar")
 @patch("src.importrr.archive.os.stat")
 def test_copy_returns_true_on_full_success(mock_stat, mock_create_tar):
-    mock_create_tar.return_value = []
+    mock_create_tar.return_value = ([], 2048)
     mock_stat_obj = MagicMock()
     mock_stat_obj.st_size = 1024
     mock_stat.return_value = mock_stat_obj
@@ -52,12 +62,67 @@ def test_copy_returns_true_on_full_success(mock_stat, mock_create_tar):
 
 @patch("src.importrr.archive.create_tar")
 @patch("src.importrr.archive.os.stat")
+def test_copy_records_archive_metrics(mock_stat, mock_create_tar):
+    # create_tar reports the real .tar size; the metric tracks that, not the
+    # sum of the two 1024-byte source files.
+    mock_create_tar.return_value = ([], 4096)
+    mock_stat_obj = MagicMock()
+    mock_stat_obj.st_size = 1024
+    mock_stat.return_value = mock_stat_obj
+
+    before_count = _archives_created("home")
+    before_bytes = _archived_bytes("home")
+
+    copy("/test/root", ["a.jpg", "b.jpg"], "/test/archive", "test_prefix", "home")
+
+    assert _archives_created("home") == before_count + 1
+    assert _archived_bytes("home") == before_bytes + 4096
+
+
+@patch("src.importrr.archive.create_tar")
+@patch("src.importrr.archive.os.stat")
+@patch("src.importrr.archive.MAX_SIZE", 1500)
+def test_copy_counts_early_archive_when_later_tar_raises(mock_stat, mock_create_tar):
+    # Two archives worth of files; the second create_tar blows up. The first
+    # archive was already written and must still be reflected in the metrics.
+    mock_stat_objs = []
+    for size in [1000, 1000, 1000]:
+        mock_obj = MagicMock()
+        mock_obj.st_size = size
+        mock_stat_objs.append(mock_obj)
+    mock_stat.side_effect = mock_stat_objs
+    mock_create_tar.side_effect = [([], 500), OSError("disk full")]
+
+    before_count = _archives_created("home")
+    before_bytes = _archived_bytes("home")
+
+    with pytest.raises(OSError, match="disk full"):
+        copy("/test/root", ["a.jpg", "b.jpg", "c.jpg"], "/test/archive", "p", "home")
+
+    assert _archives_created("home") == before_count + 1
+    assert _archived_bytes("home") == before_bytes + 500
+
+
+@patch("src.importrr.archive.create_tar")
+def test_copy_no_files_records_nothing(mock_create_tar):
+    before_count = _archives_created("home")
+    before_bytes = _archived_bytes("home")
+
+    assert copy("/test/root", [], "/test/archive", "test_prefix", "home") is True
+
+    mock_create_tar.assert_not_called()
+    assert _archives_created("home") == before_count
+    assert _archived_bytes("home") == before_bytes
+
+
+@patch("src.importrr.archive.create_tar")
+@patch("src.importrr.archive.os.stat")
 @patch("src.importrr.archive.logger")
 def test_copy_returns_false_when_tar_member_missing(
     mock_logger, mock_stat, mock_create_tar
 ):
     # File passes stat but vanishes before create_tar can add it.
-    mock_create_tar.return_value = ["b.jpg"]
+    mock_create_tar.return_value = (["b.jpg"], 1024)
     mock_stat_obj = MagicMock()
     mock_stat_obj.st_size = 1024
     mock_stat.return_value = mock_stat_obj
@@ -77,7 +142,7 @@ def test_copy_single_tar(mock_stat, mock_create_tar):
     mock_stat_obj = MagicMock()
     mock_stat_obj.st_size = 1024
     mock_stat.return_value = mock_stat_obj
-    mock_create_tar.return_value = []
+    mock_create_tar.return_value = ([], 2048)
 
     root_dir = "/test/root"
     sorted_files = ["image1.jpg", "image2.jpg"]
@@ -109,7 +174,7 @@ def test_copy_create_multiple_tars(mock_stat, mock_create_tar):
         mock_stat_objs.append(mock_obj)
 
     mock_stat.side_effect = mock_stat_objs
-    mock_create_tar.return_value = []
+    mock_create_tar.return_value = ([], 100)
 
     root_dir = "/test/root"
     sorted_files = ["file1.jpg", "file2.jpg", "file3.jpg", "file4.jpg", "file5.jpg"]
@@ -151,7 +216,7 @@ def test_create_tar_success(mock_tarfile_open, mock_exists, mock_getsize):
     prefix = "test_prefix"
     index = 0
 
-    assert create_tar(root_dir, sorted_files, archive_dir, prefix, index) == []
+    assert create_tar(root_dir, sorted_files, archive_dir, prefix, index) == ([], 2048)
 
     expected_tar_file = os.path.join(archive_dir, f"{prefix}-{index}.tar")
 
@@ -185,7 +250,9 @@ def test_create_tar_file_not_found(
     prefix = "test_prefix"
     index = 0
 
-    missing = create_tar(root_dir, sorted_files, archive_dir, prefix, index)
+    missing, archive_size = create_tar(
+        root_dir, sorted_files, archive_dir, prefix, index
+    )
 
     # tar.add should only be called for file1
     mock_tar.add.assert_called_once_with(
@@ -197,6 +264,7 @@ def test_create_tar_file_not_found(
         "File not found for archiving: file2.jpg"
     )
     assert missing == ["file2.jpg"]
+    assert archive_size == 1024
 
 
 @patch("src.importrr.archive.logger")

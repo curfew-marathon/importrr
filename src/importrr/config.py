@@ -68,6 +68,7 @@ class Config:
             archive_dir = os.path.join(self.archive_root, section_name)
 
             d = {
+                "section": section_name,
                 "album": album_dir,
                 "archive": archive_dir,
                 "import": import_value,

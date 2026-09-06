@@ -1,4 +1,5 @@
 import logging
+import os
 import signal
 import sys
 from datetime import datetime
@@ -6,6 +7,7 @@ from datetime import datetime
 from apscheduler.schedulers.blocking import BlockingScheduler
 from apscheduler.triggers.cron import CronTrigger
 
+from importrr import metrics
 from importrr.config import Config
 from importrr.sort import Sort
 
@@ -19,7 +21,12 @@ logger = logging.getLogger(__name__)
 
 
 def main_process():
-    """Main processing function that can be called from scheduler or directly"""
+    """Run one full pass over every configuration section.
+
+    Returns the number of sections that raised. A per-section failure is logged
+    and skipped so the remaining sections still run; only an error outside the
+    section loop (e.g. an unreadable config) propagates.
+    """
     try:
         logger.info("Starting importrr application")
         config = Config()
@@ -27,21 +34,32 @@ def main_process():
         total_sections = len(config.get_data())
         logger.info(f"Processing {total_sections} configuration sections")
 
+        failed = 0
         for i, d in enumerate(config.get_data(), 1):
             try:
                 logger.info(
                     f"Processing section {i}/{total_sections}: {d.get('album')}"
                 )
-                sort = Sort(d.get("album"), d.get("archive"))
+                sort = Sort(d.get("album"), d.get("archive"), d.get("section"))
                 for import_dir in d.get("import"):
                     sort.launch(import_dir)
             except Exception as e:  # noqa: BLE001
+                failed += 1
+                metrics.SECTION_FAILURES_TOTAL.labels(
+                    section=d.get("section") or "unknown"
+                ).inc()
                 logger.error(f"Failed to process section {i}: {e}")
                 logger.debug(f"Section details: {d}")
                 # Continue with next section instead of crashing
                 continue
 
-        logger.info("Importrr application completed successfully")
+        if failed:
+            logger.warning(
+                f"Importrr application completed with {failed} failed section(s)"
+            )
+        else:
+            logger.info("Importrr application completed successfully")
+        return failed
 
     except Exception as e:
         logger.error(f"Fatal error in importrr application: {e}")
@@ -74,16 +92,30 @@ class ImportrrScheduler:
 
         try:
             # Run the main import process
-            main_process()
+            with metrics.JOB_DURATION_SECONDS.time():
+                failed = main_process()
 
             job_end = datetime.now()  # noqa: DTZ005
             duration = job_end - job_start
-            logger.info("=" * 60)
-            logger.info(f"Import job completed successfully at {job_end}")
-            logger.info(f"Total duration: {duration}")
-            logger.info("=" * 60)
+            if failed:
+                metrics.JOB_RUNS_TOTAL.labels(outcome="partial").inc()
+                logger.warning("=" * 60)
+                logger.warning(
+                    f"Import job finished at {job_end} with {failed} failed section(s)"
+                )
+                logger.warning(f"Total duration: {duration}")
+                logger.warning("=" * 60)
+            else:
+                metrics.JOB_RUNS_TOTAL.labels(outcome="success").inc()
+                metrics.LAST_SUCCESS_TIMESTAMP.set_to_current_time()
+                logger.info("=" * 60)
+                logger.info(f"Import job completed successfully at {job_end}")
+                logger.info(f"Total duration: {duration}")
+                logger.info("=" * 60)
 
         except Exception as e:  # noqa: BLE001
+            metrics.JOB_RUNS_TOTAL.labels(outcome="error").inc()
+
             job_end = datetime.now()  # noqa: DTZ005
             duration = job_end - job_start
             logger.error("=" * 60)
@@ -130,5 +162,7 @@ class ImportrrScheduler:
 
 if __name__ == "__main__":
     logger.info("Starting importrr scheduler service")
+    if os.getenv("METRICS_ENABLED", "true").lower() in ("1", "true", "yes"):
+        metrics.start(os.getenv("METRICS_PORT", "9201"))
     scheduler = ImportrrScheduler()
     scheduler.start()

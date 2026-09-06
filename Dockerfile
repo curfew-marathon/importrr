@@ -16,5 +16,8 @@ RUN pip3 install --no-cache-dir --root-user-action=ignore -r requirements.txt
 # Set working directory
 WORKDIR /app
 
+# Prometheus metrics endpoint (see METRICS_PORT, default 9201)
+EXPOSE 9201
+
 # Go for launch with the scheduler!
 CMD ["python3", "launch.py"]

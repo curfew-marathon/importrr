@@ -1,8 +1,10 @@
 import os
 from unittest.mock import Mock, patch
 
+import pytest
 import yaml
 
+from importrr import metrics
 from src.importrr.sort import (
     MANIFEST_NAME,
     Sort,
@@ -10,6 +12,14 @@ from src.importrr.sort import (
     sort_media,
     write_manifest,
 )
+
+
+def _hist_count(histogram):
+    for sample in histogram.collect()[0].samples:
+        if sample.name.endswith("_count"):
+            return sample.value
+    return 0
+
 
 # --- sort_media parsing ---
 
@@ -121,7 +131,15 @@ def test_launch_pipeline_order(
     manager.attach_mock(mock_copy, "copy")
     manager.attach_mock(mock_cleanup, "cleanup")
 
-    Sort(str(tmp_path), str(tmp_path)).launch("images")
+    sort = Sort(str(tmp_path), str(tmp_path))
+    before_discovered = metrics.FILES_DISCOVERED_TOTAL.labels(
+        section=sort.section
+    )._value.get()
+    before_organized = metrics.FILES_ORGANIZED_TOTAL.labels(
+        section=sort.section
+    )._value.get()
+
+    sort.launch("images")
 
     assert [c[0] for c in manager.mock_calls] == [
         "sort_media",
@@ -129,6 +147,14 @@ def test_launch_pipeline_order(
         "copy",
         "cleanup",
     ]
+    assert (
+        metrics.FILES_DISCOVERED_TOTAL.labels(section=sort.section)._value.get()
+        == before_discovered + 1
+    )
+    assert (
+        metrics.FILES_ORGANIZED_TOTAL.labels(section=sort.section)._value.get()
+        == before_organized + 1
+    )
 
 
 @patch("src.importrr.sort.logger")
@@ -156,12 +182,64 @@ def test_launch_keeps_work_dir_when_archive_incomplete(
     mock_sort_media.return_value = [{"original_name": "a.jpg", "album_path": "a.jpg"}]
     mock_copy.return_value = False
 
-    Sort(str(tmp_path), str(tmp_path)).launch("images")
+    sort = Sort(str(tmp_path), str(tmp_path))
+    before_incomplete = metrics.ARCHIVE_INCOMPLETE_TOTAL.labels(
+        section=sort.section
+    )._value.get()
+
+    sort.launch("images")
 
     mock_cleanup.assert_not_called()
     assert any(
         "Archive incomplete" in str(c.args[0]) for c in mock_logger.warning.mock_calls
     )
+    assert (
+        metrics.ARCHIVE_INCOMPLETE_TOTAL.labels(section=sort.section)._value.get()
+        == before_incomplete + 1
+    )
+
+
+@patch("src.importrr.sort.os.path.exists", return_value=False)
+@patch("src.importrr.sort.os.path.isdir", return_value=True)
+@patch("src.importrr.sort.cleanup")
+@patch("src.importrr.sort.archive.copy")
+@patch("src.importrr.sort.write_manifest")
+@patch("src.importrr.sort.sort_media")
+@patch("src.importrr.sort.make_work_dir")
+@patch("src.importrr.sort.get_media_files")
+def test_launch_counts_incomplete_when_archive_raises(
+    mock_get_media_files,
+    mock_make_work_dir,
+    mock_sort_media,
+    mock_write_manifest,
+    mock_copy,
+    mock_cleanup,
+    _mock_isdir,
+    _mock_exists,
+    tmp_path,
+):
+    mock_get_media_files.return_value = ["a.jpg"]
+    mock_sort_media.return_value = [{"original_name": "a.jpg", "album_path": "a.jpg"}]
+    mock_copy.side_effect = OSError("tar write failed")
+
+    sort = Sort(str(tmp_path), str(tmp_path))
+    before_incomplete = metrics.ARCHIVE_INCOMPLETE_TOTAL.labels(
+        section=sort.section
+    )._value.get()
+    before_batches = _hist_count(metrics.BATCH_DURATION_SECONDS)
+
+    with pytest.raises(OSError, match="tar write failed"):
+        sort.launch("images")
+
+    # The exception propagates for recovery handling, but the batch is still
+    # counted as an incomplete archive, its duration is still recorded, and
+    # cleanup is skipped.
+    mock_cleanup.assert_not_called()
+    assert (
+        metrics.ARCHIVE_INCOMPLETE_TOTAL.labels(section=sort.section)._value.get()
+        == before_incomplete + 1
+    )
+    assert _hist_count(metrics.BATCH_DURATION_SECONDS) == before_batches + 1
 
 
 # --- cleanup ---

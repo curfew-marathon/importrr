@@ -5,7 +5,7 @@ from datetime import datetime
 
 import yaml
 
-from importrr import archive, exifhelper
+from importrr import archive, exifhelper, metrics
 
 logger = logging.getLogger(__name__)
 
@@ -216,13 +216,16 @@ def last_accessed(file):
 
 
 class Sort:
-    def __init__(self, root_dir, archive_dir=None):
+    def __init__(self, root_dir, archive_dir=None, section=None):
         if not os.path.isdir(root_dir):
             raise OSError("Directory doesn't exist " + root_dir)
         if archive_dir is not None and not os.path.isdir(archive_dir):
             raise OSError("Directory doesn't exist " + archive_dir)
         self.root_dir = root_dir
         self.archive_dir = archive_dir
+        # Label value for per-section metrics. Falls back to the album folder
+        # name for callers that construct Sort directly (e.g. tests).
+        self.section = section or os.path.basename(os.path.normpath(root_dir))
 
     def launch(self, import_dir):
         """Sort a batch, write its manifest, archive it, then clean up.
@@ -243,49 +246,78 @@ class Sort:
             return
 
         import_dir = abs_import_dir
-        result = get_media_files(import_dir, time_cutoff)
+        result = []
+        # finally: record the batch duration even when a step below raises, so
+        # slow archive/transcode failures still land in the histogram.
+        try:
+            result = get_media_files(import_dir, time_cutoff)
+            metrics.FILES_DISCOVERED_TOTAL.labels(section=self.section).inc(len(result))
 
-        if result:
-            logger.info(f"Processing {len(result)} files")
-            work_dir = os.path.join(import_dir, prefix)
-            make_work_dir(import_dir, work_dir, result)
-            entries = sort_media(self.root_dir, work_dir)  # Use work_dir directly
-            sorted_media = [entry["album_path"] for entry in entries]
-
-            remaining_files = os.listdir(work_dir) if os.path.exists(work_dir) else []
-            if remaining_files:
-                logger.warning(
-                    f"Unable to process {len(remaining_files)} files - they remain in {work_dir}"
+            if result:
+                logger.info(f"Processing {len(result)} files")
+                work_dir = os.path.join(import_dir, prefix)
+                make_work_dir(import_dir, work_dir, result)
+                entries = sort_media(self.root_dir, work_dir)  # Use work_dir directly
+                sorted_media = [entry["album_path"] for entry in entries]
+                metrics.FILES_ORGANIZED_TOTAL.labels(section=self.section).inc(
+                    len(entries)
                 )
-                logger.debug(f"Remaining files: {remaining_files}")
+
+                remaining_files = (
+                    os.listdir(work_dir) if os.path.exists(work_dir) else []
+                )
+                metrics.WORKDIR_LEFTOVER_FILES.labels(section=self.section).set(
+                    len(remaining_files)
+                )
+                if remaining_files:
+                    logger.warning(
+                        f"Unable to process {len(remaining_files)} files - they remain in {work_dir}"
+                    )
+                    logger.debug(f"Remaining files: {remaining_files}")
+                else:
+                    logger.info("Successfully processed all files")
+
+                # Write-Ahead Log: record the batch before the slow, crash-prone
+                # transcode + archive phase so it can be recovered after a hard kill.
+                if os.path.isdir(work_dir):
+                    write_manifest(self.root_dir, work_dir, prefix, entries)
+
+                archive_complete = True
+                if self.archive_dir is not None:
+                    logger.info(f"Creating archive with {len(sorted_media)} files")
+                    try:
+                        archive_complete = archive.copy(
+                            self.root_dir,
+                            sorted_media,
+                            self.archive_dir,
+                            prefix,
+                            self.section,
+                        )
+                    except Exception:
+                        # A tar or file-I/O error leaves the batch unarchived
+                        # just as a False return does; count it before it
+                        # propagates so the metric does not silently miss it.
+                        metrics.ARCHIVE_INCOMPLETE_TOTAL.labels(
+                            section=self.section
+                        ).inc()
+                        raise
+
+                # Safe cleanup runs only after a fully successful archive. On a
+                # partial failure the work_dir and its manifest are kept so the
+                # batch can be recovered. cleanup() also independently refuses to
+                # delete a work_dir that still holds media.
+                if archive_complete:
+                    cleanup(work_dir)
+                else:
+                    metrics.ARCHIVE_INCOMPLETE_TOTAL.labels(section=self.section).inc()
+                    logger.warning(
+                        f"Archive incomplete - keeping {work_dir} and its manifest "
+                        f"for recovery"
+                    )
             else:
-                logger.info("Successfully processed all files")
-
-            # Write-Ahead Log: record the batch before the slow, crash-prone
-            # transcode + archive phase so it can be recovered after a hard kill.
-            if os.path.isdir(work_dir):
-                write_manifest(self.root_dir, work_dir, prefix, entries)
-
-            archive_complete = True
-            if self.archive_dir is not None:
-                logger.info(f"Creating archive with {len(sorted_media)} files")
-                archive_complete = archive.copy(
-                    self.root_dir, sorted_media, self.archive_dir, prefix
-                )
-
-            # Safe cleanup runs only after a fully successful archive. On a
-            # partial failure the work_dir and its manifest are kept so the
-            # batch can be recovered. cleanup() also independently refuses to
-            # delete a work_dir that still holds media.
-            if archive_complete:
-                cleanup(work_dir)
-            else:
-                logger.warning(
-                    f"Archive incomplete - keeping {work_dir} and its manifest "
-                    f"for recovery"
-                )
-        else:
-            logger.info("No files found for processing")
-
-        elapsed = time.time() - start
-        logger.info(f"Completed processing {len(result)} files in {elapsed:.2f}s")
+                metrics.WORKDIR_LEFTOVER_FILES.labels(section=self.section).set(0)
+                logger.info("No files found for processing")
+        finally:
+            elapsed = time.time() - start
+            metrics.BATCH_DURATION_SECONDS.observe(elapsed)
+            logger.info(f"Completed processing {len(result)} files in {elapsed:.2f}s")
