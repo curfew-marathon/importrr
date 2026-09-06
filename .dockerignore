@@ -1,0 +1,8 @@
+# Only src/ and requirements.txt are needed for the image build.
+*
+!src
+!requirements.txt
+
+# Never ship local env or VCS metadata even if the above changes.
+.env
+.git
