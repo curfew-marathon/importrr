@@ -103,28 +103,46 @@ target pointing at the Docker host on port 9201.
 
 # Usage
 
-## Docker (Recommended)
+## Docker Compose (Recommended)
 
-The easiest way to run importrr is with Docker:
+The easiest way to run importrr is with `docker-compose.yml` plus a local `.env`:
 
 ```bash
-# Pull the pre-built image
+# Set your paths (edit the copy - .env is gitignored)
+cp .env.example .env
+$EDITOR .env
+
+# Start / stop
+./start.sh          # --pull refreshes the image, --logs follows logs
+./stop.sh           # --images also drops the pulled image
+```
+
+`docker-compose.yml` keeps no host-specific values - directories, the NFS server
+address and its exports all come from `.env` (see `.env.example` for every
+variable). `./start.sh` creates `.env` from the example if it is missing,
+validates the compose file, brings the stack up, and checks the container does
+not crash-loop.
+
+The container starts the scheduler automatically: an import runs once on
+startup, then every 2 hours from 8 AM to 10 PM (see [Scheduling](#scheduling)).
+The metrics endpoint (see [Metrics](#metrics)) is published on `METRICS_PORT`
+(default `9201`); set `METRICS_ENABLED=false` in `.env` to turn it off.
+
+### Plain `docker run` (alternative)
+
+```bash
 sudo docker pull curfewmarathon/importrr
 
-# Run with volume mounts for your config and photos
 docker run -d \
   -v /path/to/config:/config \
-  -v /path/to/photos:/album \
-  -v /path/to/archive:/archive \
+  -v /path/to/photos:/data \
   -p 9201:9201 \
   curfewmarathon/importrr
 ```
 
-The container will start the scheduler automatically and run every 2 hours.
-
-`-p 9201:9201` publishes the metrics endpoint (see [Metrics](#metrics)). If you
-set a custom `METRICS_PORT`, publish that port instead (`-p <port>:<port>`), or
-pass `-e METRICS_ENABLED=false` to turn the endpoint off and drop the `-p`.
+The `/data` mount must contain both the `album_dir` and `archive_dir` roots from
+your `config.ini`. If they live on separate paths, add a `-v` for each so
+archives are not written into the container's own layer.
 
 ### Building from source (optional):
 
