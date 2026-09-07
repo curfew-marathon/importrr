@@ -123,8 +123,9 @@ variable). `./start.sh` creates `.env` from the example if it is missing,
 validates the compose file, brings the stack up, and checks the container does
 not crash-loop.
 
-The container starts the scheduler automatically and runs every 2 hours. The
-metrics endpoint (see [Metrics](#metrics)) is published on `METRICS_PORT`
+The container starts the scheduler automatically: an import runs once on
+startup, then every 2 hours from 8 AM to 10 PM (see [Scheduling](#scheduling)).
+The metrics endpoint (see [Metrics](#metrics)) is published on `METRICS_PORT`
 (default `9201`); set `METRICS_ENABLED=false` in `.env` to turn it off.
 
 ### Plain `docker run` (alternative)

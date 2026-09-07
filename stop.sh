@@ -35,4 +35,6 @@ DOWN_ARGS=(down --remove-orphans)
 log "Stopping importrr..."
 docker compose "${DOWN_ARGS[@]}"
 
-log "Done. Any tar files left in the archive dirs are retried on the next ./start.sh."
+log "Done."
+log "An interrupted batch leaves its files plus a manifest.yml in a timestamped"
+log "folder under the import dir; move the files back to re-import them."
