@@ -73,9 +73,9 @@ importrr uses APScheduler for intelligent job scheduling with built-in error han
 importrr exposes Prometheus metrics over HTTP so job health, throughput and
 transcode cost can be monitored.
 
-- Endpoint: `http://<host>:9201/metrics`
+- Endpoint: `http://<host>:9130/metrics`
 - `METRICS_ENABLED` (default `true`) - set to `0`/`false`/`no` to disable the server
-- `METRICS_PORT` (default `9201`) - port the `/metrics` server binds
+- `METRICS_PORT` (default `9130`) - port the `/metrics` server binds
 
 Any metrics startup failure (port in use, bad port value, anything else) is
 logged and swallowed; it never stops the scheduler.
@@ -99,7 +99,7 @@ logged and swallowed; it never stops the scheduler.
 | `importrr_transcode_output_bytes_total` | counter | | Output bytes produced by ffmpeg |
 
 To scrape it from the standalone Prometheus stack, add a `job_name: importrr`
-target pointing at the Docker host on port 9201.
+target pointing at the Docker host on port 9130.
 
 # Usage
 
@@ -126,7 +126,7 @@ not crash-loop.
 The container starts the scheduler automatically: an import runs once on
 startup, then every 2 hours from 8 AM to 10 PM (see [Scheduling](#scheduling)).
 The metrics endpoint (see [Metrics](#metrics)) is published on `METRICS_PORT`
-(default `9201`); set `METRICS_ENABLED=false` in `.env` to turn it off.
+(default `9130`); set `METRICS_ENABLED=false` in `.env` to turn it off.
 
 ### Plain `docker run` (alternative)
 
@@ -136,7 +136,7 @@ docker pull ghcr.io/curfew-marathon/importrr:latest
 docker run -d \
   -v /path/to/config:/config:ro \
   -v /path/to/photos:/data \
-  -p 9201:9201 \
+  -p 9130:9130 \
   ghcr.io/curfew-marathon/importrr:latest
 ```
 

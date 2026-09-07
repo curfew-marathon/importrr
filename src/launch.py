@@ -163,6 +163,6 @@ class ImportrrScheduler:
 if __name__ == "__main__":
     logger.info("Starting importrr scheduler service")
     if os.getenv("METRICS_ENABLED", "true").lower() in ("1", "true", "yes"):
-        metrics.start(os.getenv("METRICS_PORT", "9201"))
+        metrics.start(os.getenv("METRICS_PORT", "9130"))
     scheduler = ImportrrScheduler()
     scheduler.start()
