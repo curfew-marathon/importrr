@@ -128,6 +128,51 @@ def backfill_video_tag(import_dir, root_dir, tag):
     run_exiftool(root_dir, params)
 
 
+def classify_unprocessed(root_dir, work_dir, names):
+    """Explain why each still-present file was not organized.
+
+    ``names`` is the raw ``os.listdir(work_dir)`` after the sort phase - the
+    files ExifTool never moved into the album tree. Returns
+    ``[{"name": str, "reason": str}]``, one entry per media file (the manifest
+    itself is skipped). Best effort: any ExifTool failure degrades to a generic
+    reason rather than raising, so the diagnostic never breaks the pipeline.
+    """
+    media = [n for n in names if not n.startswith("manifest.yml")]
+    if not media:
+        return []
+
+    os.chdir(root_dir)
+    meta_by_name = {}
+    try:
+        with ExifToolHelper(common_args=[], check_execute=False) as et:
+            for meta in et.get_tags(
+                [os.path.join(work_dir, n) for n in media],
+                tags=["DateTimeOriginal", "FileType", "Error"],
+            ):
+                meta_by_name[os.path.basename(meta.get("SourceFile", ""))] = meta
+    except ExifToolExecuteError as e:
+        logger.warning(f"Could not probe unprocessed files with ExifTool: {e}")
+
+    skipped = []
+    for name in media:
+        meta = meta_by_name.get(name, {})
+        error = meta.get("Error")
+        if error:
+            reason = f"unreadable or unsupported: {error}"
+        elif not meta:
+            reason = "unreadable or unsupported: ExifTool returned no metadata"
+        elif not meta.get("DateTimeOriginal"):
+            reason = (
+                f"no capture date in metadata (type={meta.get('FileType') or 'unknown'})"
+            )
+        else:
+            reason = "not renamed by ExifTool (unexpected)"
+        skipped.append({"name": name, "reason": reason})
+        logger.warning(f"Skipped (not imported): {name} - {reason}")
+
+    return skipped
+
+
 def run_exiftool(root_dir, params, on_error=True):
     logger.debug(
         f"Running ExifTool with params: {' '.join(params[:3])}..."

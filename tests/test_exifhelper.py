@@ -195,3 +195,87 @@ def test_run_exiftool_error_handling(
         run_exiftool("/test/root", ["-test"], on_error=on_error)
 
     mock_chdir.assert_called_once_with("/test/root")
+
+
+# --- classify_unprocessed ---
+
+
+def _classify_with(tag_dicts):
+    with patch("src.importrr.exifhelper.os.chdir"), patch(
+        "src.importrr.exifhelper.ExifToolHelper"
+    ) as mock_helper:
+        et = mock_helper.return_value.__enter__.return_value
+        et.get_tags.return_value = tag_dicts
+
+        from src.importrr.exifhelper import classify_unprocessed
+
+        return classify_unprocessed("/album", "/album/import/20260905184400", NAMES)
+
+
+NAMES = ["VID_1.mov", "BAD.txt", "OK.jpg", "manifest.yml"]
+
+
+def test_classify_unprocessed_reasons():
+    result = _classify_with(
+        [
+            {
+                "SourceFile": "/album/import/20260905184400/VID_1.mov",
+                "FileType": "MOV",
+            },
+            {
+                "SourceFile": "/album/import/20260905184400/BAD.txt",
+                "Error": "Unknown file type",
+            },
+            {
+                "SourceFile": "/album/import/20260905184400/OK.jpg",
+                "FileType": "JPEG",
+                "DateTimeOriginal": "2026:09:05 18:44:00",
+            },
+        ]
+    )
+
+    assert result == [
+        {"name": "VID_1.mov", "reason": "no capture date in metadata (type=MOV)"},
+        {"name": "BAD.txt", "reason": "unreadable or unsupported: Unknown file type"},
+        {"name": "OK.jpg", "reason": "not renamed by ExifTool (unexpected)"},
+    ]
+
+
+def test_classify_unprocessed_ignores_manifest():
+    result = _classify_with([])
+    assert all(item["name"] != "manifest.yml" for item in result)
+    assert {item["name"] for item in result} == {"VID_1.mov", "BAD.txt", "OK.jpg"}
+    # No metadata returned for any file -> generic unreadable reason.
+    assert all("ExifTool returned no metadata" in item["reason"] for item in result)
+
+
+def test_classify_unprocessed_survives_exiftool_error(caplog):
+    from exiftool.exceptions import ExifToolExecuteError
+
+    with patch("src.importrr.exifhelper.os.chdir"), patch(
+        "src.importrr.exifhelper.ExifToolHelper"
+    ) as mock_helper:
+        et = mock_helper.return_value.__enter__.return_value
+        try:
+            err = ExifToolExecuteError(1, "out", "err", "-p")
+        except TypeError:
+            err = ExifToolExecuteError(1)
+        et.get_tags.side_effect = err
+
+        from src.importrr.exifhelper import classify_unprocessed
+
+        result = classify_unprocessed("/album", "/work", ["a.mov"])
+
+    assert result == [
+        {
+            "name": "a.mov",
+            "reason": "unreadable or unsupported: ExifTool returned no metadata",
+        }
+    ]
+
+
+def test_classify_unprocessed_empty():
+    from src.importrr.exifhelper import classify_unprocessed
+
+    assert classify_unprocessed("/album", "/work", ["manifest.yml"]) == []
+    assert classify_unprocessed("/album", "/work", []) == []

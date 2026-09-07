@@ -53,8 +53,12 @@ def cleanup(work_dir):
         logger.error(f"Failed to remove directory {work_dir}: {e}")
 
 
-def write_manifest(root_dir, work_dir, batch_id, entries):
+def write_manifest(root_dir, work_dir, batch_id, entries, skipped=None):
     """Persist the batch (what is about to be transcoded and archived) as YAML.
+
+    ``skipped`` is a list of ``{"name", "reason"}`` for files that were staged
+    but not organized; it is recorded so the retained work_dir carries a
+    machine-readable record of what is missing and why.
 
     A failure to write the manifest is logged but does not stop the pipeline.
     """
@@ -70,7 +74,7 @@ def write_manifest(root_dir, work_dir, batch_id, entries):
             item["transcoded_mp4_path"] = os.path.splitext(album_abs)[0] + ".mp4"
         files.append(item)
 
-    doc = {"batch_id": batch_id, "files": files}
+    doc = {"batch_id": batch_id, "files": files, "skipped": skipped or []}
     manifest_path = os.path.join(work_dir, MANIFEST_NAME)
     tmp_path = f"{manifest_path}.tmp"
     try:
@@ -79,7 +83,10 @@ def write_manifest(root_dir, work_dir, batch_id, entries):
             fh.flush()
             os.fsync(fh.fileno())
         os.replace(tmp_path, manifest_path)
-        logger.info(f"Wrote manifest with {len(files)} entries: {manifest_path}")
+        skipped_note = f", {len(doc['skipped'])} skipped" if doc["skipped"] else ""
+        logger.info(
+            f"Wrote manifest with {len(files)} entries{skipped_note}: {manifest_path}"
+        )
     except OSError as e:
         logger.warning(f"Failed to write manifest {manifest_path}: {e}")
         # Don't leave a partial temp file behind: cleanup() would read it as
@@ -146,6 +153,7 @@ def get_media_files(import_dir, time_cutoff):
         return []
 
     result = []
+    deferred = 0
     logger.debug(f"Scanning {len(entries)} entries in {import_dir}")
 
     for d in entries:
@@ -157,6 +165,7 @@ def get_media_files(import_dir, time_cutoff):
                     result.append(d)
                     logger.debug(f"Added file for processing: {d}")
                 else:
+                    deferred += 1
                     logger.debug(f"Skipping recently accessed file: {d}")
             elif os.path.isdir(f):
                 logger.debug(f"Skipping directory: {d}")
@@ -166,6 +175,10 @@ def get_media_files(import_dir, time_cutoff):
             logger.warning(f"Cannot access {d}: {e}")
             continue
 
+    if deferred:
+        logger.info(
+            f"Deferred {deferred} recently-modified file(s) to a later run"
+        )
     logger.info(f"Found {len(result)} files ready for processing in {import_dir}")
     return result
 
@@ -269,18 +282,22 @@ class Sort:
                 metrics.WORKDIR_LEFTOVER_FILES.labels(section=self.section).set(
                     len(remaining_files)
                 )
+                skipped = []
                 if remaining_files:
+                    # Per-file reason for each unorganized file; also logged.
+                    skipped = exifhelper.classify_unprocessed(
+                        self.root_dir, work_dir, remaining_files
+                    )
                     logger.warning(
                         f"Unable to process {len(remaining_files)} files - they remain in {work_dir}"
                     )
-                    logger.debug(f"Remaining files: {remaining_files}")
                 else:
                     logger.info("Successfully processed all files")
 
                 # Write-Ahead Log: record the batch before the slow, crash-prone
                 # transcode + archive phase so it can be recovered after a hard kill.
                 if os.path.isdir(work_dir):
-                    write_manifest(self.root_dir, work_dir, prefix, entries)
+                    write_manifest(self.root_dir, work_dir, prefix, entries, skipped)
 
                 archive_complete = True
                 if self.archive_dir is not None:
