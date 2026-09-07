@@ -15,12 +15,16 @@ services:
       - METRICS_ENABLED=${METRICS_ENABLED:-true}
       - METRICS_PORT=${METRICS_PORT:-9201}
     ports:
-      - "${METRICS_PORT:-9201}:${METRICS_PORT:-9201}"
+      # METRICS_HOST=0.0.0.0 publishes on every host interface (same as a bare
+      # "9201:9201"); set it to 127.0.0.1 to expose /metrics only to a local
+      # Prometheus.
+      - "${METRICS_HOST:-0.0.0.0}:${METRICS_PORT:-9201}:${METRICS_PORT:-9201}"
     volumes:
       - ${IMPORTRR_CONFIG_DIR:-./config}:/config
       - ${IMPORTRR_DATA_DIR:-./data}:/data
       # Extra NFS shares mounted into the album/archive tree. Point the targets at
-      # the roots your config.ini uses; drop a share you do not need.
+      # the roots your config.ini uses; drop a share (and its volume below) if you
+      # have no NFS server.
       - nas_share1:${NAS_SHARE1_TARGET:-/share/share1}
       - nas_share2:${NAS_SHARE2_TARGET:-/share/share2}
     restart: unless-stopped
@@ -29,10 +33,10 @@ volumes:
   nas_share1:
     driver_opts:
       type: "nfs"
-      o: "addr=${NAS_ADDR:-nas},nolock,soft,rw"
+      o: "addr=${NAS_ADDR:-nas},${NAS_OPTIONS:-nolock,hard,rw}"
       device: ":${NAS_SHARE1_EXPORT:-/export/share1}"
   nas_share2:
     driver_opts:
       type: "nfs"
-      o: "addr=${NAS_ADDR:-nas},nolock,soft,rw"
+      o: "addr=${NAS_ADDR:-nas},${NAS_OPTIONS:-nolock,hard,rw}"
       device: ":${NAS_SHARE2_EXPORT:-/export/share2}"

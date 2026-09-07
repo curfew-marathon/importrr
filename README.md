@@ -139,6 +139,10 @@ docker run -d \
   curfewmarathon/importrr
 ```
 
+The `/data` mount must contain both the `album_dir` and `archive_dir` roots from
+your `config.ini`. If they live on separate paths, add a `-v` for each so
+archives are not written into the container's own layer.
+
 ### Building from source (optional):
 
 ```bash
