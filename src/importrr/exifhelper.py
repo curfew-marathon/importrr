@@ -137,7 +137,7 @@ def classify_unprocessed(root_dir, work_dir, names):
     itself is skipped). Best effort: any ExifTool failure degrades to a generic
     reason rather than raising, so the diagnostic never breaks the pipeline.
     """
-    media = [n for n in names if not n.startswith("manifest.yml")]
+    media = [n for n in names if n not in ("manifest.yml", "manifest.yml.tmp")]
     if not media:
         return []
 
@@ -150,7 +150,9 @@ def classify_unprocessed(root_dir, work_dir, names):
                 tags=["DateTimeOriginal", "FileType", "Error"],
             ):
                 meta_by_name[os.path.basename(meta.get("SourceFile", ""))] = meta
-    except ExifToolExecuteError as e:
+    except Exception as e:  # noqa: BLE001
+        # Best effort: a missing exiftool, a stopped helper, or a parse error
+        # must not break the pipeline. Every file falls back to a generic reason.
         logger.warning(f"Could not probe unprocessed files with ExifTool: {e}")
 
     skipped = []

@@ -354,12 +354,12 @@ def test_cleanup_missing_dir_is_noop(tmp_path):
 def test_get_media_files_logs_deferred_count(mock_logger, tmp_path):
     (tmp_path / "recent.jpg").write_text("x")
 
-    # cutoff at the epoch -> the file is "recently modified" and deferred
+    # cutoff at the epoch -> the file counts as recently touched and is deferred
     result = get_media_files(str(tmp_path), 0)
 
     assert result == []
     assert any(
-        "Deferred 1 recently-modified file(s)" in str(c.args[0])
+        "Deferred 1 recently touched file(s)" in str(c.args[0])
         for c in mock_logger.info.mock_calls
     )
 

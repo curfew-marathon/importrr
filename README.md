@@ -63,9 +63,9 @@ videos get no `FileModifyDate` fallback) cannot be placed. Fix the date and drop
 the file back into the import directory to retry. Other reasons are unreadable or
 corrupt files and unsupported file types.
 
-Files touched within the last 2 minutes are held back on purpose and retried on
-the next run; the log notes this as
-`Deferred 3 recently-modified file(s) to a later run`.
+Files touched within the last 2 minutes (created, modified, or accessed) are
+held back on purpose and retried on the next run; the log notes this as
+`Deferred 3 recently touched file(s) to a later run`.
 
 # How it works
 

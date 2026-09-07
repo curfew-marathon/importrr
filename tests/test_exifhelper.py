@@ -250,6 +250,25 @@ def test_classify_unprocessed_ignores_manifest():
     assert all("ExifTool returned no metadata" in item["reason"] for item in result)
 
 
+def test_classify_unprocessed_excludes_only_exact_manifest_names():
+    with (
+        patch("src.importrr.exifhelper.os.chdir"),
+        patch("src.importrr.exifhelper.ExifToolHelper") as mock_helper,
+    ):
+        mock_helper.return_value.__enter__.return_value.get_tags.return_value = []
+
+        from src.importrr.exifhelper import classify_unprocessed
+
+        result = classify_unprocessed(
+            "/album",
+            "/work",
+            ["manifest.yml", "manifest.yml.tmp", "manifest.yml.jpg"],
+        )
+
+    # A real leftover that merely starts with "manifest.yml" still gets a reason.
+    assert [item["name"] for item in result] == ["manifest.yml.jpg"]
+
+
 def test_classify_unprocessed_survives_exiftool_error(caplog):
     from exiftool.exceptions import ExifToolExecuteError
 

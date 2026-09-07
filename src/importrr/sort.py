@@ -176,7 +176,7 @@ def get_media_files(import_dir, time_cutoff):
             continue
 
     if deferred:
-        logger.info(f"Deferred {deferred} recently-modified file(s) to a later run")
+        logger.info(f"Deferred {deferred} recently touched file(s) to a later run")
     logger.info(f"Found {len(result)} files ready for processing in {import_dir}")
     return result
 
