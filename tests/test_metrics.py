@@ -5,8 +5,8 @@ from importrr import metrics
 
 def test_start_calls_start_http_server_with_port():
     with patch("importrr.metrics.start_http_server") as mock_start:
-        metrics.start(9201)
-    mock_start.assert_called_once_with(9201)
+        metrics.start(9130)
+    mock_start.assert_called_once_with(9130)
 
 
 def test_start_swallows_port_collision():
@@ -17,7 +17,7 @@ def test_start_swallows_port_collision():
         ),
         patch("importrr.metrics.logger") as mock_logger,
     ):
-        metrics.start(9201)  # must not raise
+        metrics.start(9130)  # must not raise
     mock_logger.error.assert_called_once()
 
 
