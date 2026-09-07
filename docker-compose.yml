@@ -4,7 +4,7 @@
 # if absent.
 services:
   importrr:
-    image: curfewmarathon/importrr:${IMPORTRR_TAG:-latest}
+    image: ghcr.io/curfew-marathon/importrr:${IMPORTRR_TAG:-latest}
     container_name: importrr
     environment:
       - PUID=${PUID:-1000}
@@ -20,7 +20,7 @@ services:
       # Prometheus.
       - "${METRICS_HOST:-0.0.0.0}:${METRICS_PORT:-9201}:${METRICS_PORT:-9201}"
     volumes:
-      - ${IMPORTRR_CONFIG_DIR:-./config}:/config
+      - ${IMPORTRR_CONFIG_DIR:-./config}:/config:ro
       - ${IMPORTRR_DATA_DIR:-./data}:/data
       # Extra NFS shares mounted into the album/archive tree. Point the targets at
       # the roots your config.ini uses; drop a share (and its volume below) if you

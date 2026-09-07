@@ -131,13 +131,13 @@ The metrics endpoint (see [Metrics](#metrics)) is published on `METRICS_PORT`
 ### Plain `docker run` (alternative)
 
 ```bash
-sudo docker pull curfewmarathon/importrr
+docker pull ghcr.io/curfew-marathon/importrr:latest
 
 docker run -d \
-  -v /path/to/config:/config \
+  -v /path/to/config:/config:ro \
   -v /path/to/photos:/data \
   -p 9201:9201 \
-  curfewmarathon/importrr
+  ghcr.io/curfew-marathon/importrr:latest
 ```
 
 The `/data` mount must contain both the `album_dir` and `archive_dir` roots from
