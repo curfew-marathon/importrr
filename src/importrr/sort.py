@@ -203,7 +203,18 @@ def make_work_dir(cur_dir, work_dir, file_list):
 
         for f in file_list:
             f_from = os.path.join(cur_dir, f)
-            f_to = os.path.join(work_dir, f)
+
+            # A staged file whose name is the reserved WAL name would be
+            # overwritten by write_manifest() and then deleted by cleanup().
+            # Move it in under a .orig suffix so it survives as a normal leftover.
+            dest_name = f
+            if f in (MANIFEST_NAME, f"{MANIFEST_NAME}.tmp"):
+                dest_name = f"{f}.orig"
+                logger.warning(
+                    f"Staged file '{f}' collides with the reserved manifest name; "
+                    f"moving it in as '{dest_name}'"
+                )
+            f_to = os.path.join(work_dir, dest_name)
 
             # Check if target file already exists
             if os.path.exists(f_to):

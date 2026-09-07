@@ -133,11 +133,15 @@ def classify_unprocessed(root_dir, work_dir, names):
 
     ``names`` is the raw ``os.listdir(work_dir)`` after the sort phase - the
     files ExifTool never moved into the album tree. Returns
-    ``[{"name": str, "reason": str}]``, one entry per media file (the manifest
-    itself is skipped). Best effort: any ExifTool failure degrades to a generic
-    reason rather than raising, so the diagnostic never breaks the pipeline.
+    ``[{"name": str, "reason": str}]``, one entry per file. Best effort: any
+    ExifTool failure degrades to a generic reason rather than raising, so the
+    diagnostic never breaks the pipeline.
+
+    The batch manifest is not written until after this runs, and ``make_work_dir``
+    renames any staged file that collides with the manifest name, so every entry
+    here is a genuine unorganized file.
     """
-    media = [n for n in names if n not in ("manifest.yml", "manifest.yml.tmp")]
+    media = list(names)
     if not media:
         return []
 

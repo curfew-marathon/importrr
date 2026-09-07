@@ -213,7 +213,7 @@ def _classify_with(tag_dicts):
         return classify_unprocessed("/album", "/album/import/20260905184400", NAMES)
 
 
-NAMES = ["VID_1.mov", "BAD.txt", "OK.jpg", "manifest.yml"]
+NAMES = ["VID_1.mov", "BAD.txt", "OK.jpg"]
 
 
 def test_classify_unprocessed_reasons():
@@ -242,15 +242,16 @@ def test_classify_unprocessed_reasons():
     ]
 
 
-def test_classify_unprocessed_ignores_manifest():
+def test_classify_unprocessed_no_metadata_is_generic_reason():
     result = _classify_with([])
-    assert all(item["name"] != "manifest.yml" for item in result)
     assert {item["name"] for item in result} == {"VID_1.mov", "BAD.txt", "OK.jpg"}
     # No metadata returned for any file -> generic unreadable reason.
     assert all("ExifTool returned no metadata" in item["reason"] for item in result)
 
 
-def test_classify_unprocessed_excludes_only_exact_manifest_names():
+def test_classify_unprocessed_classifies_every_name():
+    # No name is special-cased: even a file called "manifest.yml" gets a reason
+    # (make_work_dir renames such collisions before we get here).
     with (
         patch("src.importrr.exifhelper.os.chdir"),
         patch("src.importrr.exifhelper.ExifToolHelper") as mock_helper,
@@ -265,8 +266,11 @@ def test_classify_unprocessed_excludes_only_exact_manifest_names():
             ["manifest.yml", "manifest.yml.tmp", "manifest.yml.jpg"],
         )
 
-    # A real leftover that merely starts with "manifest.yml" still gets a reason.
-    assert [item["name"] for item in result] == ["manifest.yml.jpg"]
+    assert [item["name"] for item in result] == [
+        "manifest.yml",
+        "manifest.yml.tmp",
+        "manifest.yml.jpg",
+    ]
 
 
 def test_classify_unprocessed_survives_exiftool_error(caplog):
@@ -298,5 +302,4 @@ def test_classify_unprocessed_survives_exiftool_error(caplog):
 def test_classify_unprocessed_empty():
     from src.importrr.exifhelper import classify_unprocessed
 
-    assert classify_unprocessed("/album", "/work", ["manifest.yml"]) == []
     assert classify_unprocessed("/album", "/work", []) == []

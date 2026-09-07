@@ -10,6 +10,7 @@ from src.importrr.sort import (
     Sort,
     cleanup,
     get_media_files,
+    make_work_dir,
     sort_media,
     write_manifest,
 )
@@ -304,6 +305,63 @@ def test_launch_passes_skip_reasons_to_manifest(
         "Unable to process 1 files" in str(c.args[0])
         for c in mock_logger.warning.mock_calls
     )
+
+
+# --- make_work_dir manifest-name collision ---
+
+
+@patch("src.importrr.sort.logger")
+def test_make_work_dir_renames_reserved_manifest_name(mock_logger, tmp_path):
+    src = tmp_path / "src"
+    src.mkdir()
+    (src / MANIFEST_NAME).write_text("user data")
+    (src / f"{MANIFEST_NAME}.tmp").write_text("more user data")
+    (src / "photo.jpg").write_text("img")
+    work = tmp_path / "work"
+
+    make_work_dir(
+        str(src),
+        str(work),
+        [MANIFEST_NAME, f"{MANIFEST_NAME}.tmp", "photo.jpg"],
+    )
+
+    assert (work / f"{MANIFEST_NAME}.orig").read_text() == "user data"
+    assert (work / f"{MANIFEST_NAME}.tmp.orig").read_text() == "more user data"
+    assert (work / "photo.jpg").read_text() == "img"
+    assert not (work / MANIFEST_NAME).exists()
+    assert any(
+        "collides with the reserved manifest name" in str(c.args[0])
+        for c in mock_logger.warning.mock_calls
+    )
+
+
+@patch("src.importrr.sort.exifhelper.classify_unprocessed")
+@patch("src.importrr.sort.sort_media")
+@patch("src.importrr.sort.archive.copy", return_value=True)
+def test_launch_preserves_user_file_named_manifest(
+    mock_copy, mock_sort_media, mock_classify, tmp_path
+):
+    album = tmp_path / "album"
+    (album / "images").mkdir(parents=True)
+    (album / "images" / MANIFEST_NAME).write_text("PRECIOUS USER DATA")
+
+    mock_sort_media.return_value = []  # ExifTool organizes nothing
+    mock_classify.return_value = [
+        {"name": f"{MANIFEST_NAME}.orig", "reason": "no capture date in metadata"}
+    ]
+
+    with patch("src.importrr.sort.last_accessed", return_value=0):
+        Sort(str(album), str(tmp_path)).launch("images")
+
+    work_dirs = [p for p in (album / "images").iterdir() if p.is_dir()]
+    assert len(work_dirs) == 1
+    wd = work_dirs[0]
+    # The user's file survived intact under .orig, retained for inspection.
+    assert (wd / f"{MANIFEST_NAME}.orig").read_text() == "PRECIOUS USER DATA"
+    # The WAL is a separate file that did not clobber it.
+    manifest = yaml.safe_load((wd / MANIFEST_NAME).read_text())
+    assert manifest["batch_id"]
+    assert manifest["skipped"] == mock_classify.return_value
 
 
 # --- cleanup ---
