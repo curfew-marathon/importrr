@@ -162,9 +162,7 @@ def classify_unprocessed(root_dir, work_dir, names):
         elif not meta:
             reason = "unreadable or unsupported: ExifTool returned no metadata"
         elif not meta.get("DateTimeOriginal"):
-            reason = (
-                f"no capture date in metadata (type={meta.get('FileType') or 'unknown'})"
-            )
+            reason = f"no capture date in metadata (type={meta.get('FileType') or 'unknown'})"
         else:
             reason = "not renamed by ExifTool (unexpected)"
         skipped.append({"name": name, "reason": reason})

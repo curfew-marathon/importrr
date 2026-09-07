@@ -201,9 +201,10 @@ def test_run_exiftool_error_handling(
 
 
 def _classify_with(tag_dicts):
-    with patch("src.importrr.exifhelper.os.chdir"), patch(
-        "src.importrr.exifhelper.ExifToolHelper"
-    ) as mock_helper:
+    with (
+        patch("src.importrr.exifhelper.os.chdir"),
+        patch("src.importrr.exifhelper.ExifToolHelper") as mock_helper,
+    ):
         et = mock_helper.return_value.__enter__.return_value
         et.get_tags.return_value = tag_dicts
 
@@ -252,9 +253,10 @@ def test_classify_unprocessed_ignores_manifest():
 def test_classify_unprocessed_survives_exiftool_error(caplog):
     from exiftool.exceptions import ExifToolExecuteError
 
-    with patch("src.importrr.exifhelper.os.chdir"), patch(
-        "src.importrr.exifhelper.ExifToolHelper"
-    ) as mock_helper:
+    with (
+        patch("src.importrr.exifhelper.os.chdir"),
+        patch("src.importrr.exifhelper.ExifToolHelper") as mock_helper,
+    ):
         et = mock_helper.return_value.__enter__.return_value
         try:
             err = ExifToolExecuteError(1, "out", "err", "-p")

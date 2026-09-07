@@ -372,6 +372,4 @@ def test_get_media_files_no_deferred_message_when_all_eligible(mock_logger, tmp_
     result = get_media_files(str(tmp_path), 2**40)
 
     assert result == ["old.jpg"]
-    assert not any(
-        "Deferred" in str(c.args[0]) for c in mock_logger.info.mock_calls
-    )
+    assert not any("Deferred" in str(c.args[0]) for c in mock_logger.info.mock_calls)
