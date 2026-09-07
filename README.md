@@ -48,6 +48,25 @@ Using multiple import directories is handy when importing images from multiple d
 
 Image files which cannot be cleaned, are corrupted or have malformed EXIF data will be left in a timestamped directory. Assuming the data can be manually fixed by the user, the image files can be placed back into the import directory for re-import.  
 
+### Why were files skipped?
+
+Every batch that leaves files behind tells you why, in two places:
+
+- **The log** (`docker compose logs`) has one line per file:
+  `Skipped (not imported): VID_1234.mov - no capture date in metadata (type=MOV)`
+- **`manifest.yml`** inside the retained `<import_dir>/<YYYYMMDDHHMMSS>/` folder
+  has a `skipped:` list of `{name, reason}` alongside the files themselves.
+
+The most common reason is **no capture date** - importrr sorts by
+`DateTimeOriginal`, and a file with no derivable date (often a video, since
+videos get no `FileModifyDate` fallback) cannot be placed. Fix the date and drop
+the file back into the import directory to retry. Other reasons are unreadable or
+corrupt files and unsupported file types.
+
+Files touched within the last 2 minutes (created, modified, or accessed) are
+held back on purpose and retried on the next run; the log notes this as
+`Deferred 3 recently touched file(s) to a later run`.
+
 # How it works
 
 1. **File discovery**: Find files in the `import_dir` which have not been accessed in the last 2 minutes
