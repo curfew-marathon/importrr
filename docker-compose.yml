@@ -13,12 +13,12 @@ services:
       # Optional app settings (defaults match src/launch.py). Listed here so a
       # value set in .env actually reaches the container.
       - METRICS_ENABLED=${METRICS_ENABLED:-true}
-      - METRICS_PORT=${METRICS_PORT:-9201}
+      - METRICS_PORT=${METRICS_PORT:-9130}
     ports:
       # METRICS_HOST=0.0.0.0 publishes on every host interface (same as a bare
-      # "9201:9201"); set it to 127.0.0.1 to expose /metrics only to a local
+      # "9130:9130"); set it to 127.0.0.1 to expose /metrics only to a local
       # Prometheus.
-      - "${METRICS_HOST:-0.0.0.0}:${METRICS_PORT:-9201}:${METRICS_PORT:-9201}"
+      - "${METRICS_HOST:-0.0.0.0}:${METRICS_PORT:-9130}:${METRICS_PORT:-9130}"
     volumes:
       - ${IMPORTRR_CONFIG_DIR:-./config}:/config:ro
       - ${IMPORTRR_DATA_DIR:-./data}:/data

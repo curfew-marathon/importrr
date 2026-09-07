@@ -76,7 +76,7 @@ docker compose ps
 metrics_port="$(docker compose exec -T importrr printenv METRICS_PORT 2>/dev/null | tr -d '\r' || true)"
 metrics_enabled="$(docker compose exec -T importrr printenv METRICS_ENABLED 2>/dev/null | tr -d '\r' || true)"
 case "$(printf '%s' "${metrics_enabled:-true}" | tr '[:upper:]' '[:lower:]')" in
-  1|true|yes) metrics_line="http://localhost:${metrics_port:-9201}/metrics" ;;
+  1|true|yes) metrics_line="http://localhost:${metrics_port:-9130}/metrics" ;;
   *)          metrics_line="disabled (METRICS_ENABLED=${metrics_enabled})" ;;
 esac
 cat <<EOF
