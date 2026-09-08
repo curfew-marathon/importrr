@@ -13,11 +13,14 @@ def test_adjust_extensions_params(mock_run_exiftool):
     adjust_extensions(import_dir, root_dir)
 
     expected_params = [
+        "-P",
         "-filename<%f.$fileTypeExtension",
         "-ext",
         "GIF",
         "-ext",
         "JPG",
+        "-ext",
+        "JPEG",
         "-ext",
         "PNG",
         "-ext",
@@ -33,9 +36,11 @@ def test_adjust_extensions_params(mock_run_exiftool):
 
     # Verify the exact params list, particularly that the right extensions are present
     actual_params = mock_run_exiftool.call_args[0][1]
+    assert "-P" in actual_params  # a rename must not bump mtime
     assert "-ext" in actual_params
     assert "GIF" in actual_params
     assert "JPG" in actual_params
+    assert "JPEG" in actual_params  # ".jpeg" is invisible to "-ext JPG" otherwise
     assert "PNG" in actual_params
     assert "3GP" in actual_params
     assert "MOV" in actual_params
@@ -98,10 +103,13 @@ def test_adjust_screenshots_params(mock_run_exiftool):
     import_dir = "/test/import/dir"
     root_dir = "/test/root/dir"
 
-    from src.importrr.exifhelper import adjust_screenshots
+    from src.importrr.exifhelper import _EMBEDDED_DATE_SOURCES, adjust_screenshots
+
+    mock_run_exiftool.return_value = None  # probe: no dateless files
 
     adjust_screenshots(import_dir, root_dir)
 
+    # Pass A (embedded sources), the dateless-file probe, Pass B (mtime).
     assert mock_run_exiftool.call_count == 3
 
     common = [
@@ -116,29 +124,38 @@ def test_adjust_screenshots_params(mock_run_exiftool):
         import_dir,
     ]
 
+    embedded = ["-overwrite_original", "-P"]
+    for source in _EMBEDDED_DATE_SOURCES:
+        embedded += [
+            f"-EXIF:DateTimeOriginal<{source}",
+            f"-XMP:DateCreated<{source}",
+        ]
+
     mock_run_exiftool.assert_has_calls(
         [
+            call(root_dir, embedded + common),
             call(
                 root_dir,
                 [
-                    "-overwrite_original",
-                    "-EXIF:DateTimeOriginal<PNG:CreateDate",
-                    "-XMP:DateCreated<PNG:CreateDate",
-                ]
-                + common,
+                    "-if",
+                    "not $datetimeoriginal",
+                    "-p",
+                    "$filename",
+                    "-ext",
+                    "GIF",
+                    "-ext",
+                    "JPG",
+                    "-ext",
+                    "PNG",
+                    import_dir,
+                ],
+                False,
             ),
             call(
                 root_dir,
                 [
                     "-overwrite_original",
-                    "-EXIF:DateTimeOriginal<XMP:DateCreated",
-                ]
-                + common,
-            ),
-            call(
-                root_dir,
-                [
-                    "-overwrite_original",
+                    "-P",
                     "-EXIF:DateTimeOriginal<FileModifyDate",
                     "-XMP:DateCreated<FileModifyDate",
                 ]
@@ -147,6 +164,54 @@ def test_adjust_screenshots_params(mock_run_exiftool):
         ],
         any_order=False,
     )
+    # FileModifyDate is the last resort, never an embedded source.
+    assert "FileModifyDate" not in _EMBEDDED_DATE_SOURCES
+    # best embedded source is applied last so it wins exiftool's "last valid"
+    assert _EMBEDDED_DATE_SOURCES[-1] == "EXIF:CreateDate"
+
+
+@patch("src.importrr.exifhelper.metrics.DATES_GUESSED_FROM_MTIME_TOTAL")
+@patch("src.importrr.exifhelper.run_exiftool")
+def test_adjust_screenshots_warns_and_counts_mtime_guesses(
+    mock_run_exiftool, mock_counter, caplog
+):
+    from src.importrr.exifhelper import adjust_screenshots
+
+    # Pass A returns anything; the probe (2nd call) returns two dateless names.
+    mock_run_exiftool.side_effect = [None, "a.jpg\nb.png\n", None]
+
+    with caplog.at_level("WARNING"):
+        adjust_screenshots("/imp", "/root")
+
+    warned = [r.message for r in caplog.records if "using file mtime" in r.message]
+    assert warned == [
+        "No capture date in a.jpg - using file mtime (likely wrong)",
+        "No capture date in b.png - using file mtime (likely wrong)",
+    ]
+    assert mock_counter.inc.call_count == 2
+
+
+@patch("src.importrr.exifhelper.metrics.DATES_GUESSED_FROM_MTIME_TOTAL")
+@patch("src.importrr.exifhelper.run_exiftool")
+def test_adjust_screenshots_no_guesses_when_probe_empty(mock_run_exiftool, mock_counter):
+    from src.importrr.exifhelper import adjust_screenshots
+
+    mock_run_exiftool.return_value = None  # probe finds nothing dateless
+
+    adjust_screenshots("/imp", "/root")
+
+    mock_counter.inc.assert_not_called()
+
+
+@patch("src.importrr.exifhelper.run_exiftool")
+def test_images_missing_capture_date_parses_and_tolerates_empty(mock_run_exiftool):
+    from src.importrr.exifhelper import _images_missing_capture_date
+
+    mock_run_exiftool.return_value = "one.jpg\ntwo.png\n\n"
+    assert _images_missing_capture_date("/imp", "/root") == ["one.jpg", "two.png"]
+
+    mock_run_exiftool.return_value = None  # exiftool exit 2 -> run_exiftool -> None
+    assert _images_missing_capture_date("/imp", "/root") == []
 
 
 @patch("src.importrr.exifhelper.os.chdir")

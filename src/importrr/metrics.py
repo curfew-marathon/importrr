@@ -64,6 +64,11 @@ WORKDIR_LEFTOVER_FILES = Gauge(
     "Files left behind in a work_dir after the most recent batch (recovery needed)",
     ["section"],
 )
+DATES_GUESSED_FROM_MTIME_TOTAL = Counter(
+    "importrr_dates_guessed_from_mtime_total",
+    "Images given a capture date from their file mtime because no embedded date "
+    "(EXIF/XMP/IPTC/GPS/PNG) was present - the guess is often wrong",
+)
 BATCH_DURATION_SECONDS = Histogram(
     "importrr_batch_duration_seconds",
     "Wall-clock time to process one import_dir batch",
