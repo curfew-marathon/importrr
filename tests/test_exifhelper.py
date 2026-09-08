@@ -193,7 +193,9 @@ def test_adjust_screenshots_warns_and_counts_mtime_guesses(
 
 @patch("src.importrr.exifhelper.metrics.DATES_GUESSED_FROM_MTIME_TOTAL")
 @patch("src.importrr.exifhelper.run_exiftool")
-def test_adjust_screenshots_no_guesses_when_probe_empty(mock_run_exiftool, mock_counter):
+def test_adjust_screenshots_no_guesses_when_probe_empty(
+    mock_run_exiftool, mock_counter
+):
     from src.importrr.exifhelper import adjust_screenshots
 
     mock_run_exiftool.return_value = None  # probe finds nothing dateless

@@ -117,9 +117,7 @@ def adjust_screenshots(import_dir, root_dir):
         logger.warning(f"Could not enumerate dateless files before mtime pass: {e}")
         guessed = []
     for name in guessed:
-        logger.warning(
-            f"No capture date in {name} - using file mtime (likely wrong)"
-        )
+        logger.warning(f"No capture date in {name} - using file mtime (likely wrong)")
         metrics.DATES_GUESSED_FROM_MTIME_TOTAL.inc()
 
     # Pass B: last resort - the file modify date.
