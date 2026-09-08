@@ -1,19 +1,37 @@
-# Host-specific values live in .env now (see .env.example). Every one has a
+# Host-specific values live in .env (see .env.example). Every one has a
 # ${VAR:-default} so this file still resolves if .env is missing - the fallbacks
 # just are not your real directories. ./start.sh creates .env from the example
 # if absent.
+#
+# One image, two paths (the service carries both `build:` and `image:`):
+#   Dev     ./start.sh           builds from `build: .` and tags it `image:`, then up.
+#   Server  ./start.sh --pull    `docker compose pull` then up --no-build - runs the
+#                                published image. IMPORTRR_TAG pins which tag it fetches.
 services:
   importrr:
+    build: .
     image: ghcr.io/curfew-marathon/importrr:${IMPORTRR_TAG:-latest}
     container_name: importrr
     environment:
-      - PUID=${PUID:-1000}
-      - PGID=${PGID:-1000}
       - TZ=${TZ:-UTC}
       # Optional app settings (defaults match src/launch.py). Listed here so a
       # value set in .env actually reaches the container.
       - METRICS_ENABLED=${METRICS_ENABLED:-true}
       - METRICS_PORT=${METRICS_PORT:-9130}
+    healthcheck:
+      # "healthy" = the scheduler process is up and serving /metrics. busybox wget
+      # + /bin/sh ship in the python:alpine base. The guard mirrors src/launch.py
+      # exactly (METRICS_ENABLED in {1,true,yes}); with metrics off there is
+      # nothing to probe, so the check passes. $$ is a literal $ for the container
+      # shell (not compose-time interpolation).
+      #
+      # NOTE: this asserts the process is alive, not that a hung `hard` NFS mount
+      # is healthy - watch importrr_job_runs_total{outcome="error"} for that.
+      test: ["CMD-SHELL", "v=$$(echo \"$${METRICS_ENABLED:-true}\" | tr 'A-Z' 'a-z'); case \"$$v\" in 1|true|yes) wget -q -O - \"http://127.0.0.1:$${METRICS_PORT:-9130}/metrics\" >/dev/null 2>&1 || exit 1 ;; *) exit 0 ;; esac"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
     ports:
       # METRICS_HOST=0.0.0.0 publishes on every host interface (same as a bare
       # "9130:9130"); set it to 127.0.0.1 to expose /metrics only to a local
