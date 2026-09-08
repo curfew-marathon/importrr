@@ -132,15 +132,22 @@ cp .env.example .env
 $EDITOR .env
 
 # Start / stop
-./start.sh          # --pull refreshes the image, --logs follows logs
-./stop.sh           # --images also drops the pulled image
+./start.sh          # builds the image from source, then starts
+./start.sh --pull   # run the published image instead of building (server default)
+./start.sh --logs   # follow logs once healthy
+./stop.sh           # --images also removes the image; --volumes drops the NFS handles
 ```
+
+Default `./start.sh` builds from source so you run exactly what is in your tree;
+`--pull` is the explicit opt-in to the published `ghcr.io/curfew-marathon/importrr`
+image (the server passes it on every start). `--no-build` runs whatever image is
+already present.
 
 `docker-compose.yml` keeps no host-specific values - directories, the NFS server
 address and its exports all come from `.env` (see `.env.example` for every
 variable). `./start.sh` creates `.env` from the example if it is missing,
-validates the compose file, brings the stack up, and checks the container does
-not crash-loop.
+validates the compose file, brings the stack up, and waits for the container's
+healthcheck.
 
 The container starts the scheduler automatically: an import runs once on
 startup, then every 2 hours from 8 AM to 10 PM (see [Scheduling](#scheduling)).
@@ -163,15 +170,17 @@ The `/data` mount must contain both the `album_dir` and `archive_dir` roots from
 your `config.ini`. If they live on separate paths, add a `-v` for each so
 archives are not written into the container's own layer.
 
-### Building from source (optional):
+### Building from source
+
+`./start.sh` already builds from `docker-compose.yml`. To build the image by hand:
 
 ```bash
-# Build the container locally
 docker build -t importrr .
+```
 
 ## Local Development
 
-For development or testing, you can run importrr locally:
+For development or testing, you can run importrr locally without Docker:
 
 ```bash
 # Install dependencies

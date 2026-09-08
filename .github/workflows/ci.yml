@@ -44,10 +44,20 @@ jobs:
       run: |
         pytest --cov=. --cov-report=term-missing
 
+  compose-check:
+    name: Docker Compose Config Check
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v7
+    - name: Validate docker-compose.yml syntax
+      run: |
+        touch .env
+        docker compose config --quiet
+
   publish-docker:
     name: Build & Push
     runs-on: ubuntu-latest
-    needs: [test]
+    needs: [test, compose-check]
     if: github.event_name == 'push'
     permissions:
       contents: read
