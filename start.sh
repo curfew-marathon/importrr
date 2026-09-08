@@ -59,9 +59,9 @@ _has_build_services() {
 }
 
 # Poll every configured compose service to one shared deadline. A service passes
-# when it declares a healthcheck and reports "healthy", or declares none and is
-# "running". A container that is missing, exited, or still coming up keeps the
-# stack pending until the deadline, then fails with the pending list.
+# only while its container is "running" AND (it has no healthcheck, or reports
+# "healthy"). Missing / exited / still coming up keeps the stack pending until
+# the deadline, then fails with the pending list.
 #
 # Uses `config --services` (every configured service) not `ps --services` (only
 # services with a live container): a service whose container exits right after
@@ -80,16 +80,19 @@ wait_for_health() {
       if [ -z "$cid" ]; then all_ok=0; pending="$pending ${svc}(no-container)"; continue; fi
       status="$(docker inspect -f '{{.State.Status}}' "$cid" 2>/dev/null || echo unknown)"
       health="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$cid" 2>/dev/null || echo none)"
-      case "$health" in
-        healthy) ;;
-        starting|unhealthy) all_ok=0; pending="$pending ${svc}(${health})" ;;
-        none)
-          # No healthcheck declared: "running" is the bar. Anything else
-          # (created/restarting/exited/dead/paused) keeps the stack pending;
-          # a crash-looper is almost never "running" when polled, so the
-          # deadline still catches it.
-          [ "$status" = "running" ] || { all_ok=0; pending="$pending ${svc}(${status})"; } ;;
-      esac
+      # "running" is required regardless of the health value: Docker keeps the
+      # last .State.Health.Status ("healthy") after a container exits, so a
+      # crash right after going healthy would otherwise pass. created / restarting
+      # / exited / dead / paused all keep the stack pending; a crash-looper is
+      # almost never "running" when polled, so the deadline still catches it.
+      if [ "$status" != "running" ]; then
+        all_ok=0; pending="$pending ${svc}(${status})"
+      else
+        case "$health" in
+          healthy|none) ;;
+          *) all_ok=0; pending="$pending ${svc}(${health})" ;;   # starting | unhealthy
+        esac
+      fi
     done
 
     if [ "$all_ok" = "1" ]; then log "All services healthy."; return 0; fi

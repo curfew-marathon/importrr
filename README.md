@@ -172,11 +172,15 @@ archives are not written into the container's own layer.
 
 ### Building from source
 
-`./start.sh` already builds from `docker-compose.yml`. To build the image by hand:
+`./start.sh` already builds from `docker-compose.yml`. To build the image by hand
+under the name Compose expects (so `./start.sh --no-build` can then use it):
 
 ```bash
-docker build -t importrr .
+docker compose build
 ```
+
+A plain `docker build -t importrr .` tags `importrr:latest`, which the compose
+file (`image: ghcr.io/curfew-marathon/importrr:...`) will not pick up.
 
 ## Local Development
 
