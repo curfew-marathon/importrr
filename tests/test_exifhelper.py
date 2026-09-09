@@ -24,6 +24,10 @@ def test_adjust_extensions_params(mock_run_exiftool):
         "-ext",
         "PNG",
         "-ext",
+        "HEIC",
+        "-ext",
+        "HEIF",
+        "-ext",
         "3GP",
         "-ext",
         "MOV",
@@ -38,13 +42,8 @@ def test_adjust_extensions_params(mock_run_exiftool):
     actual_params = mock_run_exiftool.call_args[0][1]
     assert "-P" in actual_params  # a rename must not bump mtime
     assert "-ext" in actual_params
-    assert "GIF" in actual_params
-    assert "JPG" in actual_params
-    assert "JPEG" in actual_params  # ".jpeg" is invisible to "-ext JPG" otherwise
-    assert "PNG" in actual_params
-    assert "3GP" in actual_params
-    assert "MOV" in actual_params
-    assert "MP4" in actual_params
+    for ext in ("GIF", "JPG", "JPEG", "PNG", "HEIC", "HEIF", "3GP", "MOV", "MP4"):
+        assert ext in actual_params  # ".jpeg"/".HEIC" would skip later passes otherwise
 
 
 @patch("src.importrr.exifhelper.run_exiftool")
@@ -103,7 +102,11 @@ def test_adjust_screenshots_params(mock_run_exiftool):
     import_dir = "/test/import/dir"
     root_dir = "/test/root/dir"
 
-    from src.importrr.exifhelper import _EMBEDDED_DATE_SOURCES, adjust_screenshots
+    from src.importrr.exifhelper import (
+        _EMBEDDED_DATE_SOURCES,
+        _IMAGE_EXTS,
+        adjust_screenshots,
+    )
 
     mock_run_exiftool.return_value = None  # probe: no dateless files
 
@@ -112,17 +115,23 @@ def test_adjust_screenshots_params(mock_run_exiftool):
     # Pass A (embedded sources), the dateless-file probe, Pass B (mtime).
     assert mock_run_exiftool.call_count == 3
 
-    common = [
-        "-if",
-        "not $datetimeoriginal",
+    # EXIF-dated still formats. HEIC/HEIF included so a stripped re-encode gets
+    # the same fallback as a dateless JPG instead of being left unorganized.
+    assert _IMAGE_EXTS == ("GIF", "JPG", "PNG", "HEIC", "HEIF")
+    ext_args = [
         "-ext",
         "GIF",
         "-ext",
         "JPG",
         "-ext",
         "PNG",
-        import_dir,
+        "-ext",
+        "HEIC",
+        "-ext",
+        "HEIF",
     ]
+
+    common = ["-if", "not $datetimeoriginal", *ext_args, import_dir]
 
     embedded = ["-overwrite_original", "-P"]
     for source in _EMBEDDED_DATE_SOURCES:
@@ -141,12 +150,7 @@ def test_adjust_screenshots_params(mock_run_exiftool):
                     "not $datetimeoriginal",
                     "-p",
                     "$filename",
-                    "-ext",
-                    "GIF",
-                    "-ext",
-                    "JPG",
-                    "-ext",
-                    "PNG",
+                    *ext_args,
                     import_dir,
                 ],
                 False,

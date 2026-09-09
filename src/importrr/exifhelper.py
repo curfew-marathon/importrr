@@ -26,6 +26,20 @@ _EMBEDDED_DATE_SOURCES = (
     "EXIF:CreateDate",
 )
 
+# Still-image formats whose capture date lives in EXIF (video uses QuickTime
+# tags instead - see backfill_videos). HEIC/HEIF are here too: an iPhone HEIC
+# normally carries a date, but one re-encoded by a messaging app or a converter
+# arrives stripped, exactly like an Instagram JPG, and should get the same
+# fallback rather than being left unorganized.
+_IMAGE_EXTS = ("GIF", "JPG", "PNG", "HEIC", "HEIF")
+
+
+def _ext_args(exts):
+    args = []
+    for ext in exts:
+        args += ["-ext", ext]
+    return args
+
 
 def organize(import_dir, root_dir):
     logger.info("Organizing files by date and renaming")
@@ -57,27 +71,15 @@ def adjust_extensions(import_dir, root_dir):
     params = [
         "-P",
         "-filename<%f.$fileTypeExtension",
-        "-ext",
-        "GIF",
-        "-ext",
-        "JPG",
-        "-ext",
-        "JPEG",
-        "-ext",
-        "PNG",
-        "-ext",
-        "3GP",
-        "-ext",
-        "MOV",
-        "-ext",
-        "MP4",
+        *_ext_args(["GIF", "JPG", "JPEG", "PNG", "HEIC", "HEIF", "3GP", "MOV", "MP4"]),
         import_dir,
     ]
     run_exiftool(root_dir, params)
 
 
 def adjust_screenshots(import_dir, root_dir):
-    """Give GIF/JPG/PNG files a DateTimeOriginal when they arrive without one.
+    """Give still images (:data:`_IMAGE_EXTS`) a DateTimeOriginal when they
+    arrive without one.
 
     Pass A copies the best available *embedded* date (see
     :data:`_EMBEDDED_DATE_SOURCES`). Whatever is still dateless afterwards is
@@ -91,12 +93,7 @@ def adjust_screenshots(import_dir, root_dir):
     common_params = [
         "-if",
         "not $datetimeoriginal",
-        "-ext",
-        "GIF",
-        "-ext",
-        "JPG",
-        "-ext",
-        "PNG",
+        *_ext_args(_IMAGE_EXTS),
         import_dir,
     ]
 
@@ -135,8 +132,8 @@ def adjust_screenshots(import_dir, root_dir):
 
 
 def _images_missing_capture_date(import_dir, root_dir):
-    """Basenames of GIF/JPG/PNG files under ``import_dir`` that still have no
-    ``DateTimeOriginal``.
+    """Basenames of still images (:data:`_IMAGE_EXTS`) under ``import_dir`` that
+    still have no ``DateTimeOriginal``.
 
     ExifTool does the filtering natively (``-if`` + ``-p``) and prints only the
     failing names, so Python never loads a per-file tag dict (the ``get_tags``
@@ -148,12 +145,7 @@ def _images_missing_capture_date(import_dir, root_dir):
         "not $datetimeoriginal",
         "-p",
         "$filename",
-        "-ext",
-        "GIF",
-        "-ext",
-        "JPG",
-        "-ext",
-        "PNG",
+        *_ext_args(_IMAGE_EXTS),
         import_dir,
     ]
     # on_error=False: ExifTool exits 2 ("all files failed the condition") when
