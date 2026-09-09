@@ -166,8 +166,20 @@ def test_adjust_screenshots_params(mock_run_exiftool):
     )
     # FileModifyDate is the last resort, never an embedded source.
     assert "FileModifyDate" not in _EMBEDDED_DATE_SOURCES
-    # best embedded source is applied last so it wins exiftool's "last valid"
-    assert _EMBEDDED_DATE_SOURCES[-1] == "EXIF:CreateDate"
+    # Pin the whole priority order (worst first, so exiftool's "last valid"
+    # redirect picks the best). This mirrors photo-stage's DATE_SOURCES; a silent
+    # reorder here would desync the two tools.
+    assert _EMBEDDED_DATE_SOURCES == (
+        "EXIF:ModifyDate",
+        "PNG:ModifyDate",
+        "PNG:CreateDate",
+        "PNG:CreationTime",
+        "Composite:GPSDateTime",
+        "IPTC:DateCreated",
+        "XMP:CreateDate",
+        "XMP:DateCreated",
+        "EXIF:CreateDate",
+    )
 
 
 @patch("src.importrr.exifhelper.metrics.DATES_GUESSED_FROM_MTIME_TOTAL")

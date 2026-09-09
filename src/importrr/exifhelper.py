@@ -135,8 +135,9 @@ def _images_missing_capture_date(import_dir, root_dir):
     ``DateTimeOriginal``.
 
     ExifTool does the filtering natively (``-if`` + ``-p``) and prints only the
-    failing names, so this stays flat in memory no matter how large the batch.
-    An empty batch, or one where every file already has a date, yields ``[]``.
+    failing names, so Python never loads a per-file tag dict (the ``get_tags``
+    alternative would) - just the list of names. An empty batch, or one where
+    every file already has a date, yields ``[]``.
     """
     params = [
         "-if",
