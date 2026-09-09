@@ -217,6 +217,24 @@ def test_adjust_screenshots_no_guesses_when_probe_empty(
     mock_counter.inc.assert_not_called()
 
 
+@patch("src.importrr.exifhelper.metrics.DATES_GUESSED_FROM_MTIME_TOTAL")
+@patch("src.importrr.exifhelper.run_exiftool")
+def test_adjust_screenshots_does_not_count_when_mtime_pass_fails(
+    mock_run_exiftool, mock_counter, caplog
+):
+    from src.importrr.exifhelper import adjust_screenshots
+
+    # Pass A ok, probe finds a dateless file, Pass B raises.
+    mock_run_exiftool.side_effect = [None, "a.jpg\n", RuntimeError("exiftool blew up")]
+
+    with pytest.raises(RuntimeError), caplog.at_level("WARNING"):
+        adjust_screenshots("/imp", "/root")
+
+    # Pass B never applied the mtime date, so nothing is warned or counted.
+    assert not any("using file mtime" in r.message for r in caplog.records)
+    mock_counter.inc.assert_not_called()
+
+
 @patch("src.importrr.exifhelper.run_exiftool")
 def test_images_missing_capture_date_parses_and_tolerates_empty(mock_run_exiftool):
     from src.importrr.exifhelper import _images_missing_capture_date

@@ -109,16 +109,13 @@ def adjust_screenshots(import_dir, root_dir):
         params.append(f"-XMP:DateCreated<{source}")
     run_exiftool(root_dir, params + common_params)
 
-    # Anything still without a date is about to be guessed from its mtime.
-    # Best effort: a probe failure must not stop the batch from being sorted.
+    # Snapshot what is still dateless before Pass B stamps it. Best effort: a
+    # probe failure must not stop the batch from being sorted.
     try:
         guessed = _images_missing_capture_date(import_dir, root_dir)
     except Exception as e:  # noqa: BLE001
         logger.warning(f"Could not enumerate dateless files before mtime pass: {e}")
         guessed = []
-    for name in guessed:
-        logger.warning(f"No capture date in {name} - using file mtime (likely wrong)")
-        metrics.DATES_GUESSED_FROM_MTIME_TOTAL.inc()
 
     # Pass B: last resort - the file modify date.
     params = [
@@ -128,6 +125,13 @@ def adjust_screenshots(import_dir, root_dir):
         "-XMP:DateCreated<FileModifyDate",
     ] + common_params
     run_exiftool(root_dir, params)
+
+    # Pass B completed: record what it had to guess. Kept after the call so a
+    # Pass B failure (which aborts the batch) does not leave phantom warnings or
+    # inflate the counter for dates that were never written.
+    for name in guessed:
+        logger.warning(f"No capture date in {name} - using file mtime (likely wrong)")
+        metrics.DATES_GUESSED_FROM_MTIME_TOTAL.inc()
 
 
 def _images_missing_capture_date(import_dir, root_dir):
