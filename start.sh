@@ -54,8 +54,14 @@ done
 
 # ── helpers ──────────────────────────────────────────────────────────────────
 # True when the resolved compose config declares at least one build context.
+# Capture first, then grep the variable: `docker compose config | grep -q` lets
+# grep close the pipe on the first match, `config` can then exit 141 (SIGPIPE),
+# and `set -o pipefail` would turn a repo that HAS a build context into "no
+# build context here".
 _has_build_services() {
-  docker compose config 2>/dev/null | grep -qE '^[[:space:]]+context:[[:space:]]'
+  local cfg
+  cfg="$(docker compose config 2>/dev/null || true)"
+  grep -qE '^[[:space:]]+context:[[:space:]]' <<<"$cfg"
 }
 
 # Poll every configured compose service to one shared deadline. A service passes
@@ -74,12 +80,15 @@ wait_for_health() {
 
   log "Waiting up to ${timeout}s for services to report healthy..."
   while :; do
-    local all_ok=1 pending="" svc cid status health
+    local all_ok=1 pending="" svc cid snap status health
     for svc in $services; do
       cid="$(docker compose ps -aq "$svc" 2>/dev/null | head -n1 || true)"
       if [ -z "$cid" ]; then all_ok=0; pending="$pending ${svc}(no-container)"; continue; fi
-      status="$(docker inspect -f '{{.State.Status}}' "$cid" 2>/dev/null || echo unknown)"
-      health="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$cid" 2>/dev/null || echo none)"
+      # One inspect snapshot. Two calls would let the container exit between them:
+      # call 1 sees "running", call 2 returns the retained "healthy" - exactly the
+      # crash this guard rejects. Inspect failure -> "unknown|none" -> not-ready.
+      snap="$(docker inspect -f '{{.State.Status}}|{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$cid" 2>/dev/null || echo 'unknown|none')"
+      status="${snap%%|*}"; health="${snap##*|}"
       # "running" is required regardless of the health value: Docker keeps the
       # last .State.Health.Status ("healthy") after a container exits, so a
       # crash right after going healthy would otherwise pass. created / restarting
