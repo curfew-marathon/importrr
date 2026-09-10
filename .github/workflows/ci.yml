@@ -9,6 +9,10 @@ on:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
+# Least privilege by default. publish-docker overrides this with packages: write.
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest

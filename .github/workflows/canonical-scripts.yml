@@ -1,0 +1,19 @@
+name: canonical-scripts
+
+# Fails if this repo's copy of the shared start.sh / stop.sh blocks drifts from
+# the pinned hash. See scripts/canonical-hash.sh. hivemind is the reference.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  drift:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: ./scripts/canonical-hash.sh --check
