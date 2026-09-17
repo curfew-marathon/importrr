@@ -8,6 +8,7 @@ from importrr import metrics
 from src.importrr.sort import (
     MANIFEST_NAME,
     Sort,
+    _skip_category,
     cleanup,
     get_media_files,
     make_work_dir,
@@ -154,7 +155,7 @@ def test_launch_pipeline_order(
         section=sort.section
     )._value.get()
     before_organized = metrics.FILES_ORGANIZED_TOTAL.labels(
-        section=sort.section
+        section=sort.section, media_type="image"
     )._value.get()
 
     sort.launch("images")
@@ -170,7 +171,9 @@ def test_launch_pipeline_order(
         == before_discovered + 1
     )
     assert (
-        metrics.FILES_ORGANIZED_TOTAL.labels(section=sort.section)._value.get()
+        metrics.FILES_ORGANIZED_TOTAL.labels(
+            section=sort.section, media_type="image"
+        )._value.get()
         == before_organized + 1
     )
 
@@ -305,6 +308,110 @@ def test_launch_passes_skip_reasons_to_manifest(
         "Unable to process 1 files" in str(c.args[0])
         for c in mock_logger.warning.mock_calls
     )
+
+
+@patch("src.importrr.sort.exifhelper.classify_unprocessed")
+@patch("src.importrr.sort.os.listdir", return_value=["stuck.mov"])
+@patch("src.importrr.sort.os.path.isdir", return_value=True)
+@patch("src.importrr.sort.os.path.exists", return_value=True)
+@patch("src.importrr.sort.cleanup")
+@patch("src.importrr.sort.archive.copy", return_value=True)
+@patch("src.importrr.sort.write_manifest")
+@patch("src.importrr.sort.sort_media")
+@patch("src.importrr.sort.make_work_dir")
+@patch("src.importrr.sort.get_media_files")
+def test_launch_counts_skipped_files_by_category(
+    mock_get_media_files,
+    mock_make_work_dir,
+    mock_sort_media,
+    mock_write_manifest,
+    mock_copy,
+    mock_cleanup,
+    _mock_exists,
+    _mock_isdir,
+    _mock_listdir,
+    mock_classify,
+    tmp_path,
+):
+    mock_get_media_files.return_value = ["ok.jpg", "stuck.mov"]
+    mock_sort_media.return_value = [{"original_name": "ok.jpg", "album_path": "ok.jpg"}]
+    mock_classify.return_value = [
+        {"name": "stuck.mov", "reason": "no capture date in metadata (type=MOV)"}
+    ]
+
+    sort = Sort(str(tmp_path), str(tmp_path))
+    before = metrics.FILES_SKIPPED_TOTAL.labels(
+        section=sort.section, reason="no_capture_date"
+    )._value.get()
+
+    sort.launch("images")
+
+    assert (
+        metrics.FILES_SKIPPED_TOTAL.labels(
+            section=sort.section, reason="no_capture_date"
+        )._value.get()
+        == before + 1
+    )
+
+
+@patch("src.importrr.sort.os.listdir", return_value=[])
+@patch("src.importrr.sort.os.path.isdir", return_value=True)
+@patch("src.importrr.sort.os.path.exists", return_value=True)
+@patch("src.importrr.sort.cleanup")
+@patch("src.importrr.sort.archive.copy", return_value=True)
+@patch("src.importrr.sort.write_manifest")
+@patch("src.importrr.sort.sort_media")
+@patch("src.importrr.sort.make_work_dir")
+@patch("src.importrr.sort.get_media_files")
+def test_launch_counts_organized_files_by_media_type(
+    mock_get_media_files,
+    mock_make_work_dir,
+    mock_sort_media,
+    mock_write_manifest,
+    mock_copy,
+    mock_cleanup,
+    _mock_exists,
+    _mock_isdir,
+    _mock_listdir,
+    tmp_path,
+):
+    mock_get_media_files.return_value = ["a.jpg", "b.mov", "c.txt"]
+    mock_sort_media.return_value = [
+        {"original_name": "a.jpg", "album_path": "2026/09/a.jpg"},
+        {"original_name": "b.mov", "album_path": "2026/09/b.mov"},
+        {"original_name": "c.txt", "album_path": "2026/09/c.txt"},
+    ]
+
+    sort = Sort(str(tmp_path), str(tmp_path))
+    before = {
+        media_type: metrics.FILES_ORGANIZED_TOTAL.labels(
+            section=sort.section, media_type=media_type
+        )._value.get()
+        for media_type in ("image", "video", "other")
+    }
+
+    sort.launch("images")
+
+    for media_type in ("image", "video", "other"):
+        assert (
+            metrics.FILES_ORGANIZED_TOTAL.labels(
+                section=sort.section, media_type=media_type
+            )._value.get()
+            == before[media_type] + 1
+        )
+
+
+@pytest.mark.parametrize(
+    ("reason", "expected"),
+    [
+        ("unreadable or unsupported: Unknown file type", "unreadable"),
+        ("unreadable or unsupported: ExifTool returned no metadata", "unreadable"),
+        ("no capture date in metadata (type=MOV)", "no_capture_date"),
+        ("not renamed by ExifTool (unexpected)", "other"),
+    ],
+)
+def test_skip_category(reason, expected):
+    assert _skip_category(reason) == expected
 
 
 # --- make_work_dir manifest-name collision ---

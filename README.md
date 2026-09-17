@@ -106,7 +106,8 @@ logged and swallowed; it never stops the scheduler.
 | `importrr_last_success_timestamp_seconds` | gauge | | Unix time of the last job where every section succeeded |
 | `importrr_section_failures_total` | counter | `section` | Config sections that raised during a job run |
 | `importrr_files_discovered_total` | counter | `section` | Media files found ready to process |
-| `importrr_files_organized_total` | counter | `section` | Files sorted into the album tree |
+| `importrr_files_organized_total` | counter | `section`, `media_type` | Files sorted into the album tree, by media type (`image`/`video`/`other`) |
+| `importrr_files_skipped_total` | counter | `section`, `reason` | Files staged for a batch but never organized (`no_capture_date`/`unreadable`/`other`) |
 | `importrr_workdir_leftover_files` | gauge | `section` | Files left in a work_dir after the last batch |
 | `importrr_batch_duration_seconds` | histogram | | Time to process one import_dir batch |
 | `importrr_archives_created_total` | counter | `section` | Tar archives written |
