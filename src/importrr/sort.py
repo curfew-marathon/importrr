@@ -17,6 +17,22 @@ TIME_CUTOFF = 2
 MANIFEST_NAME = "manifest.yml"
 
 
+def _skip_category(reason):
+    """Collapse classify_unprocessed's free-text reason into the small,
+    bounded set of label values importrr_files_skipped_total accepts.
+
+    The full reason (which can embed an arbitrary ExifTool error string) still
+    goes to the log and the manifest; only this coarse category becomes a
+    Prometheus label, so a novel ExifTool error message can never create an
+    unbounded number of metric series.
+    """
+    if reason.startswith("unreadable or unsupported"):
+        return "unreadable"
+    if reason.startswith("no capture date"):
+        return "no_capture_date"
+    return "other"
+
+
 def cleanup(work_dir):
     """Delete work_dir only when it holds nothing but (optionally) the manifest.
 
@@ -281,9 +297,11 @@ class Sort:
                 make_work_dir(import_dir, work_dir, result)
                 entries = sort_media(self.root_dir, work_dir)  # Use work_dir directly
                 sorted_media = [entry["album_path"] for entry in entries]
-                metrics.FILES_ORGANIZED_TOTAL.labels(section=self.section).inc(
-                    len(entries)
-                )
+                for entry in entries:
+                    media_type = exifhelper.media_type_for(entry["album_path"])
+                    metrics.FILES_ORGANIZED_TOTAL.labels(
+                        section=self.section, media_type=media_type
+                    ).inc()
 
                 remaining_files = (
                     os.listdir(work_dir) if os.path.exists(work_dir) else []
@@ -297,6 +315,11 @@ class Sort:
                     skipped = exifhelper.classify_unprocessed(
                         self.root_dir, work_dir, remaining_files
                     )
+                    for item in skipped:
+                        metrics.FILES_SKIPPED_TOTAL.labels(
+                            section=self.section,
+                            reason=_skip_category(item["reason"]),
+                        ).inc()
                     logger.warning(
                         f"Unable to process {len(remaining_files)} files - they remain in {work_dir}"
                     )

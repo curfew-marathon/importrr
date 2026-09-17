@@ -33,6 +33,26 @@ _EMBEDDED_DATE_SOURCES = (
 # fallback rather than being left unorganized.
 _IMAGE_EXTS = ("GIF", "JPG", "PNG", "HEIC", "HEIF")
 
+# Video formats importrr organizes (see adjust_extensions). Anything outside
+# _IMAGE_EXTS and _VIDEO_EXTS is counted as "other" rather than guessed at.
+_VIDEO_EXTS = ("MOV", "MP4", "3GP")
+
+
+def media_type_for(path):
+    """Classify an organized file's final extension as "image", "video", or
+    "other", for per-media-type metrics.
+
+    Called after adjust_extensions has already normalized the extension to
+    ExifTool's canonical form (e.g. ".jpeg" -> ".jpg"), so a plain suffix
+    check against _IMAGE_EXTS / _VIDEO_EXTS is exact - no MIME sniffing needed.
+    """
+    ext = os.path.splitext(path)[1].lstrip(".").upper()
+    if ext in _IMAGE_EXTS:
+        return "image"
+    if ext in _VIDEO_EXTS:
+        return "video"
+    return "other"
+
 
 def _ext_args(exts):
     args = []

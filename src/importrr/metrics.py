@@ -56,8 +56,13 @@ FILES_DISCOVERED_TOTAL = Counter(
 )
 FILES_ORGANIZED_TOTAL = Counter(
     "importrr_files_organized_total",
-    "Files successfully sorted and renamed into the album tree",
-    ["section"],
+    "Files successfully sorted and renamed into the album tree, by media type",
+    ["section", "media_type"],  # media_type: "image" | "video" | "other"
+)
+FILES_SKIPPED_TOTAL = Counter(
+    "importrr_files_skipped_total",
+    "Files staged for a batch but never organized, by why they were left behind",
+    ["section", "reason"],  # reason: "no_capture_date" | "unreadable" | "other"
 )
 WORKDIR_LEFTOVER_FILES = Gauge(
     "importrr_workdir_leftover_files",

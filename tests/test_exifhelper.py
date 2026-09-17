@@ -404,3 +404,27 @@ def test_classify_unprocessed_empty():
     from src.importrr.exifhelper import classify_unprocessed
 
     assert classify_unprocessed("/album", "/work", []) == []
+
+
+# --- media_type_for ---
+
+
+@pytest.mark.parametrize(
+    ("path", "expected"),
+    [
+        ("2026/09/20260905-184400.jpg", "image"),
+        ("2026/09/20260905-184400.PNG", "image"),
+        ("2026/09/20260905-184400.heic", "image"),
+        ("2026/09/20260905-184400.gif", "image"),
+        ("2026/09/20260905-184400.heif", "image"),
+        ("2026/09/20260905-184400.mov", "video"),
+        ("2026/09/20260905-184400.MP4", "video"),
+        ("2026/09/20260905-184400.3gp", "video"),
+        ("2026/09/20260905-184400.txt", "other"),
+        ("2026/09/20260905-184400", "other"),
+    ],
+)
+def test_media_type_for(path, expected):
+    from src.importrr.exifhelper import media_type_for
+
+    assert media_type_for(path) == expected
