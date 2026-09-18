@@ -22,4 +22,4 @@ WORKDIR /app
 EXPOSE 9130
 
 # Go for launch with the scheduler!
-CMD ["python3", "launch.py"]
+CMD ["python3", "-m", "importrr.launch"]

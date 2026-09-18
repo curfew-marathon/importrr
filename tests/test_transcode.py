@@ -5,15 +5,15 @@ import pytest
 from ffmpy import FFRuntimeError
 
 from importrr import metrics
-from src.importrr.transcode import FFMPEG_PARAMS, convert, transcode
+from importrr.transcode import FFMPEG_PARAMS, convert, transcode
 
 
 def _transcode_count(outcome):
     return metrics.TRANSCODE_TOTAL.labels(outcome=outcome)._value.get()
 
 
-@patch("src.importrr.transcode.transcode")
-@patch("src.importrr.transcode.os.path.exists")
+@patch("importrr.transcode.transcode")
+@patch("importrr.transcode.os.path.exists")
 def test_convert_input_not_exists(mock_exists, mock_transcode):
     mock_exists.return_value = False
 
@@ -27,10 +27,10 @@ def test_convert_input_not_exists(mock_exists, mock_transcode):
     mock_exists.assert_called_once_with(os.path.join(root_dir, source_file))
 
 
-@patch("src.importrr.transcode.exifhelper.copy_tags")
-@patch("src.importrr.transcode.os.path.getsize")
-@patch("src.importrr.transcode.os.path.exists")
-@patch("src.importrr.transcode.transcode")
+@patch("importrr.transcode.exifhelper.copy_tags")
+@patch("importrr.transcode.os.path.getsize")
+@patch("importrr.transcode.os.path.exists")
+@patch("importrr.transcode.transcode")
 def test_convert_success(mock_transcode, mock_exists, mock_getsize, mock_copy_tags):
     mock_exists.side_effect = [True, True]  # input exists, output exists
     mock_getsize.side_effect = [1024, 512]  # input size, output size
@@ -59,10 +59,10 @@ def test_convert_success(mock_transcode, mock_exists, mock_getsize, mock_copy_ta
     assert metrics.TRANSCODE_OUTPUT_BYTES_TOTAL._value.get() == before_out + 512
 
 
-@patch("src.importrr.transcode.exifhelper.copy_tags")
-@patch("src.importrr.transcode.os.path.getsize")
-@patch("src.importrr.transcode.os.path.exists")
-@patch("src.importrr.transcode.transcode")
+@patch("importrr.transcode.exifhelper.copy_tags")
+@patch("importrr.transcode.os.path.getsize")
+@patch("importrr.transcode.os.path.exists")
+@patch("importrr.transcode.transcode")
 def test_convert_counts_ffmpeg_bytes_even_when_copy_tags_fails(
     mock_transcode, mock_exists, mock_getsize, mock_copy_tags
 ):
@@ -84,8 +84,8 @@ def test_convert_counts_ffmpeg_bytes_even_when_copy_tags_fails(
     assert metrics.TRANSCODE_OUTPUT_BYTES_TOTAL._value.get() == before_out + 512
 
 
-@patch("src.importrr.transcode.os.path.exists")
-@patch("src.importrr.transcode.transcode")
+@patch("importrr.transcode.os.path.exists")
+@patch("importrr.transcode.transcode")
 def test_convert_output_not_created(mock_transcode, mock_exists):
     mock_exists.side_effect = [True, False]  # input exists, output does not exist
 
@@ -101,8 +101,8 @@ def test_convert_output_not_created(mock_transcode, mock_exists):
     )
 
 
-@patch("src.importrr.transcode.os.path.exists")
-@patch("src.importrr.transcode.transcode")
+@patch("importrr.transcode.os.path.exists")
+@patch("importrr.transcode.transcode")
 def test_convert_exception(mock_transcode, mock_exists):
     mock_exists.return_value = True  # input exists
     mock_transcode.side_effect = Exception("FFmpeg error")
@@ -121,7 +121,7 @@ def test_convert_exception(mock_transcode, mock_exists):
     )
 
 
-@patch("src.importrr.transcode.ffmpy.FFmpeg")
+@patch("importrr.transcode.ffmpy.FFmpeg")
 def test_transcode_success(mock_ffmpeg_class):
     mock_ffmpeg_instance = MagicMock()
     mock_ffmpeg_class.return_value = mock_ffmpeg_instance
@@ -137,9 +137,9 @@ def test_transcode_success(mock_ffmpeg_class):
     mock_ffmpeg_instance.run.assert_called_once()
 
 
-@patch("src.importrr.transcode.os.path.exists")
-@patch("src.importrr.transcode.os.remove")
-@patch("src.importrr.transcode.ffmpy.FFmpeg")
+@patch("importrr.transcode.os.path.exists")
+@patch("importrr.transcode.os.remove")
+@patch("importrr.transcode.ffmpy.FFmpeg")
 def test_transcode_failure(mock_ffmpeg_class, mock_remove, mock_exists):
     mock_ffmpeg_instance = MagicMock()
     mock_ffmpeg_class.return_value = mock_ffmpeg_instance
@@ -161,9 +161,9 @@ def test_transcode_failure(mock_ffmpeg_class, mock_remove, mock_exists):
     mock_remove.assert_called_once_with(output_file)
 
 
-@patch("src.importrr.transcode.os.path.exists")
-@patch("src.importrr.transcode.os.remove")
-@patch("src.importrr.transcode.ffmpy.FFmpeg")
+@patch("importrr.transcode.os.path.exists")
+@patch("importrr.transcode.os.remove")
+@patch("importrr.transcode.ffmpy.FFmpeg")
 def test_transcode_failure_no_output_file(mock_ffmpeg_class, mock_remove, mock_exists):
     mock_ffmpeg_instance = MagicMock()
     mock_ffmpeg_class.return_value = mock_ffmpeg_instance

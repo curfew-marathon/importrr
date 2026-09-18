@@ -192,10 +192,10 @@ For development or testing, you can run importrr locally without Docker:
 pip install -r requirements.txt
 
 # Run the scheduler (same as Docker behavior)
-python3 src/launch.py
+PYTHONPATH=src python3 -m importrr.launch
 
 # Or run the main process once for testing
-python3 -c "from src.launch import main_process; main_process()"
+PYTHONPATH=src python3 -c "from importrr.launch import main_process; main_process()"
 ```
 # Requirements
 

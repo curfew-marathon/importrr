@@ -1,6 +1,6 @@
 import pytest
 
-from src.importrr.config import Config
+from importrr.config import Config
 
 
 @pytest.fixture
