@@ -14,13 +14,13 @@ services:
     container_name: importrr
     environment:
       - TZ=${TZ:-UTC}
-      # Optional app settings (defaults match src/launch.py). Listed here so a
+      # Optional app settings (defaults match importrr/launch.py). Listed here so a
       # value set in .env actually reaches the container.
       - METRICS_ENABLED=${METRICS_ENABLED:-true}
       - METRICS_PORT=${METRICS_PORT:-9130}
     healthcheck:
       # "healthy" = the scheduler process is up and serving /metrics. busybox wget
-      # + /bin/sh ship in the python:alpine base. The guard mirrors src/launch.py
+      # + /bin/sh ship in the python:alpine base. The guard mirrors importrr/launch.py
       # exactly (METRICS_ENABLED in {1,true,yes}); with metrics off there is
       # nothing to probe, so the check passes. $$ is a literal $ for the container
       # shell (not compose-time interpolation).

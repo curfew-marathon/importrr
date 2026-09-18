@@ -5,7 +5,7 @@ Phil Harvey's ExifTool. See [README.md](README.md) for the full workflow and
 config.
 
 CI (Python 3.11): `ruff check .`, `ruff format --check .`, `mypy .`,
-`pytest --cov` (with `PYTHONPATH=.:src`).
+`pytest --cov` (with `PYTHONPATH=src`).
 
 ## Canonical run scripts
 

@@ -3,7 +3,7 @@ from unittest.mock import patch
 
 import pytest
 
-from src.importrr.sort import Sort
+from importrr.sort import Sort
 
 
 @pytest.fixture
@@ -17,10 +17,10 @@ def mock_directories(tmp_path):
     return root_dir, archive_dir
 
 
-@patch("src.importrr.sort.get_media_files")
-@patch("src.importrr.sort.make_work_dir")
-@patch("src.importrr.sort.sort_media")
-@patch("src.importrr.sort.archive.copy")
+@patch("importrr.sort.get_media_files")
+@patch("importrr.sort.make_work_dir")
+@patch("importrr.sort.sort_media")
+@patch("importrr.sort.archive.copy")
 def test_launch_valid_import_dir(
     mock_copy,
     mock_sort_media,
@@ -47,8 +47,8 @@ def test_launch_valid_import_dir(
     assert mock_get_media_files.call_args[0][0] == expected_path
 
 
-@patch("src.importrr.sort.get_media_files")
-@patch("src.importrr.sort.logger")
+@patch("importrr.sort.get_media_files")
+@patch("importrr.sort.logger")
 def test_launch_path_traversal_parent(
     mock_logger, mock_get_media_files, mock_directories
 ):
@@ -65,8 +65,8 @@ def test_launch_path_traversal_parent(
     )
 
 
-@patch("src.importrr.sort.get_media_files")
-@patch("src.importrr.sort.logger")
+@patch("importrr.sort.get_media_files")
+@patch("importrr.sort.logger")
 def test_launch_path_traversal_absolute(
     mock_logger, mock_get_media_files, mock_directories
 ):
@@ -81,8 +81,8 @@ def test_launch_path_traversal_absolute(
     mock_logger.error.assert_called_once_with("Path traversal attempt detected: /etc")
 
 
-@patch("src.importrr.sort.get_media_files")
-@patch("src.importrr.sort.logger")
+@patch("importrr.sort.get_media_files")
+@patch("importrr.sort.logger")
 def test_launch_path_traversal_complex(
     mock_logger, mock_get_media_files, mock_directories
 ):

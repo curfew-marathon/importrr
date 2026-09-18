@@ -5,7 +5,7 @@ import pytest
 import yaml
 
 from importrr import metrics
-from src.importrr.sort import (
+from importrr.sort import (
     MANIFEST_NAME,
     Sort,
     _skip_category,
@@ -24,10 +24,27 @@ def _hist_count(histogram):
     return 0
 
 
+# --- Sort.__init__ validation ---
+
+
+def test_sort_init_raises_when_root_dir_missing(tmp_path):
+    missing = tmp_path / "nope"
+    with pytest.raises(OSError, match="Directory doesn't exist"):
+        Sort(str(missing))
+
+
+def test_sort_init_raises_when_archive_dir_missing(tmp_path):
+    root = tmp_path / "root"
+    root.mkdir()
+    missing_archive = tmp_path / "nope"
+    with pytest.raises(OSError, match="Directory doesn't exist"):
+        Sort(str(root), str(missing_archive))
+
+
 # --- sort_media parsing ---
 
 
-@patch("src.importrr.sort.exifhelper")
+@patch("importrr.sort.exifhelper")
 def test_sort_media_parses_original_name_and_album_path(mock_exifhelper):
     mock_exifhelper.organize.return_value = [
         "'/work/20260905184400/IMG_1234.jpg' --> '2026/09/20260905-184400.jpg'",
@@ -121,14 +138,14 @@ def test_write_manifest_write_failure_is_swallowed(tmp_path):
 # --- Sort.launch pipeline ordering ---
 
 
-@patch("src.importrr.sort.os.path.exists", return_value=False)
-@patch("src.importrr.sort.os.path.isdir", return_value=True)
-@patch("src.importrr.sort.cleanup")
-@patch("src.importrr.sort.archive.copy")
-@patch("src.importrr.sort.write_manifest")
-@patch("src.importrr.sort.sort_media")
-@patch("src.importrr.sort.make_work_dir")
-@patch("src.importrr.sort.get_media_files")
+@patch("importrr.sort.os.path.exists", return_value=False)
+@patch("importrr.sort.os.path.isdir", return_value=True)
+@patch("importrr.sort.cleanup")
+@patch("importrr.sort.archive.copy")
+@patch("importrr.sort.write_manifest")
+@patch("importrr.sort.sort_media")
+@patch("importrr.sort.make_work_dir")
+@patch("importrr.sort.get_media_files")
 def test_launch_pipeline_order(
     mock_get_media_files,
     mock_make_work_dir,
@@ -178,15 +195,15 @@ def test_launch_pipeline_order(
     )
 
 
-@patch("src.importrr.sort.logger")
-@patch("src.importrr.sort.os.path.exists", return_value=False)
-@patch("src.importrr.sort.os.path.isdir", return_value=True)
-@patch("src.importrr.sort.cleanup")
-@patch("src.importrr.sort.archive.copy")
-@patch("src.importrr.sort.write_manifest")
-@patch("src.importrr.sort.sort_media")
-@patch("src.importrr.sort.make_work_dir")
-@patch("src.importrr.sort.get_media_files")
+@patch("importrr.sort.logger")
+@patch("importrr.sort.os.path.exists", return_value=False)
+@patch("importrr.sort.os.path.isdir", return_value=True)
+@patch("importrr.sort.cleanup")
+@patch("importrr.sort.archive.copy")
+@patch("importrr.sort.write_manifest")
+@patch("importrr.sort.sort_media")
+@patch("importrr.sort.make_work_dir")
+@patch("importrr.sort.get_media_files")
 def test_launch_keeps_work_dir_when_archive_incomplete(
     mock_get_media_files,
     mock_make_work_dir,
@@ -220,14 +237,14 @@ def test_launch_keeps_work_dir_when_archive_incomplete(
     )
 
 
-@patch("src.importrr.sort.os.path.exists", return_value=False)
-@patch("src.importrr.sort.os.path.isdir", return_value=True)
-@patch("src.importrr.sort.cleanup")
-@patch("src.importrr.sort.archive.copy")
-@patch("src.importrr.sort.write_manifest")
-@patch("src.importrr.sort.sort_media")
-@patch("src.importrr.sort.make_work_dir")
-@patch("src.importrr.sort.get_media_files")
+@patch("importrr.sort.os.path.exists", return_value=False)
+@patch("importrr.sort.os.path.isdir", return_value=True)
+@patch("importrr.sort.cleanup")
+@patch("importrr.sort.archive.copy")
+@patch("importrr.sort.write_manifest")
+@patch("importrr.sort.sort_media")
+@patch("importrr.sort.make_work_dir")
+@patch("importrr.sort.get_media_files")
 def test_launch_counts_incomplete_when_archive_raises(
     mock_get_media_files,
     mock_make_work_dir,
@@ -263,17 +280,17 @@ def test_launch_counts_incomplete_when_archive_raises(
     assert _hist_count(metrics.BATCH_DURATION_SECONDS) == before_batches + 1
 
 
-@patch("src.importrr.sort.logger")
-@patch("src.importrr.sort.exifhelper.classify_unprocessed")
-@patch("src.importrr.sort.os.listdir", return_value=["stuck.mov"])
-@patch("src.importrr.sort.os.path.isdir", return_value=True)
-@patch("src.importrr.sort.os.path.exists", return_value=True)
-@patch("src.importrr.sort.cleanup")
-@patch("src.importrr.sort.archive.copy", return_value=True)
-@patch("src.importrr.sort.write_manifest")
-@patch("src.importrr.sort.sort_media")
-@patch("src.importrr.sort.make_work_dir")
-@patch("src.importrr.sort.get_media_files")
+@patch("importrr.sort.logger")
+@patch("importrr.sort.exifhelper.classify_unprocessed")
+@patch("importrr.sort.os.listdir", return_value=["stuck.mov"])
+@patch("importrr.sort.os.path.isdir", return_value=True)
+@patch("importrr.sort.os.path.exists", return_value=True)
+@patch("importrr.sort.cleanup")
+@patch("importrr.sort.archive.copy", return_value=True)
+@patch("importrr.sort.write_manifest")
+@patch("importrr.sort.sort_media")
+@patch("importrr.sort.make_work_dir")
+@patch("importrr.sort.get_media_files")
 def test_launch_passes_skip_reasons_to_manifest(
     mock_get_media_files,
     mock_make_work_dir,
@@ -310,16 +327,16 @@ def test_launch_passes_skip_reasons_to_manifest(
     )
 
 
-@patch("src.importrr.sort.exifhelper.classify_unprocessed")
-@patch("src.importrr.sort.os.listdir", return_value=["stuck.mov"])
-@patch("src.importrr.sort.os.path.isdir", return_value=True)
-@patch("src.importrr.sort.os.path.exists", return_value=True)
-@patch("src.importrr.sort.cleanup")
-@patch("src.importrr.sort.archive.copy", return_value=True)
-@patch("src.importrr.sort.write_manifest")
-@patch("src.importrr.sort.sort_media")
-@patch("src.importrr.sort.make_work_dir")
-@patch("src.importrr.sort.get_media_files")
+@patch("importrr.sort.exifhelper.classify_unprocessed")
+@patch("importrr.sort.os.listdir", return_value=["stuck.mov"])
+@patch("importrr.sort.os.path.isdir", return_value=True)
+@patch("importrr.sort.os.path.exists", return_value=True)
+@patch("importrr.sort.cleanup")
+@patch("importrr.sort.archive.copy", return_value=True)
+@patch("importrr.sort.write_manifest")
+@patch("importrr.sort.sort_media")
+@patch("importrr.sort.make_work_dir")
+@patch("importrr.sort.get_media_files")
 def test_launch_counts_skipped_files_by_category(
     mock_get_media_files,
     mock_make_work_dir,
@@ -354,15 +371,15 @@ def test_launch_counts_skipped_files_by_category(
     )
 
 
-@patch("src.importrr.sort.os.listdir", return_value=[])
-@patch("src.importrr.sort.os.path.isdir", return_value=True)
-@patch("src.importrr.sort.os.path.exists", return_value=True)
-@patch("src.importrr.sort.cleanup")
-@patch("src.importrr.sort.archive.copy", return_value=True)
-@patch("src.importrr.sort.write_manifest")
-@patch("src.importrr.sort.sort_media")
-@patch("src.importrr.sort.make_work_dir")
-@patch("src.importrr.sort.get_media_files")
+@patch("importrr.sort.os.listdir", return_value=[])
+@patch("importrr.sort.os.path.isdir", return_value=True)
+@patch("importrr.sort.os.path.exists", return_value=True)
+@patch("importrr.sort.cleanup")
+@patch("importrr.sort.archive.copy", return_value=True)
+@patch("importrr.sort.write_manifest")
+@patch("importrr.sort.sort_media")
+@patch("importrr.sort.make_work_dir")
+@patch("importrr.sort.get_media_files")
 def test_launch_counts_organized_files_by_media_type(
     mock_get_media_files,
     mock_make_work_dir,
@@ -401,6 +418,16 @@ def test_launch_counts_organized_files_by_media_type(
         )
 
 
+@patch("importrr.sort.get_media_files", return_value=[])
+def test_launch_no_files_found_resets_leftover_gauge(mock_get_media_files, tmp_path):
+    sort = Sort(str(tmp_path), str(tmp_path))
+    metrics.WORKDIR_LEFTOVER_FILES.labels(section=sort.section).set(5)
+
+    sort.launch("images")
+
+    assert metrics.WORKDIR_LEFTOVER_FILES.labels(section=sort.section)._value.get() == 0
+
+
 @pytest.mark.parametrize(
     ("reason", "expected"),
     [
@@ -417,7 +444,7 @@ def test_skip_category(reason, expected):
 # --- make_work_dir manifest-name collision ---
 
 
-@patch("src.importrr.sort.logger")
+@patch("importrr.sort.logger")
 def test_make_work_dir_renames_reserved_manifest_name(mock_logger, tmp_path):
     src = tmp_path / "src"
     src.mkdir()
@@ -442,9 +469,9 @@ def test_make_work_dir_renames_reserved_manifest_name(mock_logger, tmp_path):
     )
 
 
-@patch("src.importrr.sort.exifhelper.classify_unprocessed")
-@patch("src.importrr.sort.sort_media")
-@patch("src.importrr.sort.archive.copy", return_value=True)
+@patch("importrr.sort.exifhelper.classify_unprocessed")
+@patch("importrr.sort.sort_media")
+@patch("importrr.sort.archive.copy", return_value=True)
 def test_launch_preserves_user_file_named_manifest(
     mock_copy, mock_sort_media, mock_classify, tmp_path
 ):
@@ -457,7 +484,7 @@ def test_launch_preserves_user_file_named_manifest(
         {"name": f"{MANIFEST_NAME}.orig", "reason": "no capture date in metadata"}
     ]
 
-    with patch("src.importrr.sort.last_accessed", return_value=0):
+    with patch("importrr.sort.last_accessed", return_value=0):
         Sort(str(album), str(tmp_path)).launch("images")
 
     work_dirs = [p for p in (album / "images").iterdir() if p.is_dir()]
@@ -493,7 +520,7 @@ def test_cleanup_removes_dir_with_only_manifest(tmp_path):
     assert not work_dir.exists()
 
 
-@patch("src.importrr.sort.logger")
+@patch("importrr.sort.logger")
 def test_cleanup_keeps_dir_and_manifest_when_media_remains(mock_logger, tmp_path):
     work_dir = tmp_path / "work"
     work_dir.mkdir()
@@ -512,10 +539,28 @@ def test_cleanup_missing_dir_is_noop(tmp_path):
     cleanup(str(tmp_path / "does-not-exist"))
 
 
+@patch("importrr.sort.os.listdir", side_effect=OSError("boom"))
+def test_cleanup_listdir_failure_is_swallowed(mock_listdir, tmp_path):
+    work_dir = tmp_path / "work"
+    work_dir.mkdir()
+
+    cleanup(str(work_dir))  # must not raise
+
+    assert work_dir.exists()
+
+
+@patch("importrr.sort.os.rmdir", side_effect=OSError("boom"))
+def test_cleanup_rmdir_failure_is_swallowed(mock_rmdir, tmp_path):
+    work_dir = tmp_path / "work"
+    work_dir.mkdir()
+
+    cleanup(str(work_dir))  # must not raise
+
+
 # --- get_media_files recency summary ---
 
 
-@patch("src.importrr.sort.logger")
+@patch("importrr.sort.logger")
 def test_get_media_files_logs_deferred_count(mock_logger, tmp_path):
     (tmp_path / "recent.jpg").write_text("x")
 
@@ -529,7 +574,7 @@ def test_get_media_files_logs_deferred_count(mock_logger, tmp_path):
     )
 
 
-@patch("src.importrr.sort.logger")
+@patch("importrr.sort.logger")
 def test_get_media_files_no_deferred_message_when_all_eligible(mock_logger, tmp_path):
     (tmp_path / "old.jpg").write_text("x")
 
@@ -538,3 +583,111 @@ def test_get_media_files_no_deferred_message_when_all_eligible(mock_logger, tmp_
 
     assert result == ["old.jpg"]
     assert not any("Deferred" in str(c.args[0]) for c in mock_logger.info.mock_calls)
+
+
+# --- get_media_files error handling ---
+
+
+def test_get_media_files_missing_dir_returns_empty(tmp_path):
+    assert get_media_files(str(tmp_path / "missing"), 0) == []
+
+
+def test_get_media_files_not_a_directory_returns_empty(tmp_path):
+    f = tmp_path / "not_a_dir"
+    f.write_text("x")
+
+    assert get_media_files(str(f), 0) == []
+
+
+@patch("importrr.sort.os.listdir", side_effect=PermissionError("denied"))
+def test_get_media_files_permission_error_returns_empty(mock_listdir, tmp_path):
+    assert get_media_files(str(tmp_path), 0) == []
+
+
+@patch("importrr.sort.os.listdir", side_effect=OSError("boom"))
+def test_get_media_files_oserror_returns_empty(mock_listdir, tmp_path):
+    assert get_media_files(str(tmp_path), 0) == []
+
+
+def test_get_media_files_skips_subdirectories(tmp_path):
+    (tmp_path / "subdir").mkdir()
+    (tmp_path / "old.jpg").write_text("x")
+
+    result = get_media_files(str(tmp_path), 2**40)
+
+    assert result == ["old.jpg"]
+
+
+@patch("importrr.sort.os.path.isfile", side_effect=OSError("stat failed"))
+def test_get_media_files_per_entry_stat_error_is_skipped(mock_isfile, tmp_path):
+    (tmp_path / "broken.jpg").write_text("x")
+
+    assert get_media_files(str(tmp_path), 2**40) == []
+
+
+def test_get_media_files_unresolvable_entry_is_skipped(tmp_path):
+    # A broken symlink is neither a file nor a directory (isfile/isdir both
+    # return False without raising, since the target doesn't exist).
+    (tmp_path / "weird").symlink_to(tmp_path / "does-not-exist")
+
+    assert get_media_files(str(tmp_path), 2**40) == []
+
+
+# --- make_work_dir error handling ---
+
+
+def test_make_work_dir_noop_when_no_files(tmp_path):
+    work_dir = tmp_path / "work"
+
+    make_work_dir(str(tmp_path), str(work_dir), [])
+
+    assert not work_dir.exists()
+
+
+def test_make_work_dir_reuses_existing_directory(tmp_path):
+    src = tmp_path / "src"
+    src.mkdir()
+    (src / "a.jpg").write_text("x")
+    work_dir = tmp_path / "work"
+    work_dir.mkdir()  # already exists
+
+    make_work_dir(str(src), str(work_dir), ["a.jpg"])
+
+    assert (work_dir / "a.jpg").read_text() == "x"
+
+
+def test_make_work_dir_raises_when_target_path_is_a_file(tmp_path):
+    src = tmp_path / "src"
+    src.mkdir()
+    work_dir = tmp_path / "work"
+    work_dir.write_text("not a directory")  # path exists but is a file
+
+    with pytest.raises(OSError, match="exists but is not a directory"):
+        make_work_dir(str(src), str(work_dir), ["a.jpg"])
+
+
+def test_make_work_dir_skips_file_already_at_destination(tmp_path):
+    src = tmp_path / "src"
+    src.mkdir()
+    (src / "a.jpg").write_text("new")
+    work_dir = tmp_path / "work"
+    work_dir.mkdir()
+    (work_dir / "a.jpg").write_text("already there")
+
+    make_work_dir(str(src), str(work_dir), ["a.jpg"])
+
+    # The pre-existing destination file is left untouched, and the source
+    # file is never moved.
+    assert (work_dir / "a.jpg").read_text() == "already there"
+    assert (src / "a.jpg").read_text() == "new"
+
+
+@patch("importrr.sort.os.rename", side_effect=OSError("disk full"))
+def test_make_work_dir_reraises_on_rename_failure(mock_rename, tmp_path):
+    src = tmp_path / "src"
+    src.mkdir()
+    (src / "a.jpg").write_text("x")
+    work_dir = tmp_path / "work"
+
+    with pytest.raises(OSError, match="disk full"):
+        make_work_dir(str(src), str(work_dir), ["a.jpg"])

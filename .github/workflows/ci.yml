@@ -31,7 +31,6 @@ jobs:
         python -m pip install --upgrade pip
         pip install ruff pytest pytest-cov mypy pip-audit
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-        if [ -f pyproject.toml ]; then pip install .; fi
 
     - name: Lint and Format with ruff
       run: |
@@ -48,7 +47,7 @@ jobs:
 
     - name: Run Tests with pytest and coverage
       env:
-        PYTHONPATH: .:src
+        PYTHONPATH: src
       run: |
         pytest --cov=src --cov-report=term-missing --cov-fail-under=80
 

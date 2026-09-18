@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, call, patch
 import pytest
 
 from importrr import metrics
-from src.importrr.archive import copy, create_tar
+from importrr.archive import copy, create_tar
 
 
 def _archives_created(section):
@@ -18,14 +18,14 @@ def _archived_bytes(section):
 # --- Tests for copy ---
 
 
-@patch("src.importrr.archive.logger")
+@patch("importrr.archive.logger")
 def test_copy_no_files(mock_logger):
     assert copy("/test/root", [], "/test/archive", "test_prefix") is True
     mock_logger.debug.assert_called_once_with("No files to archive")
 
 
-@patch("src.importrr.archive.transcode.convert")
-@patch("src.importrr.archive.logger")
+@patch("importrr.archive.transcode.convert")
+@patch("importrr.archive.logger")
 def test_copy_mov_conversion_failure(mock_logger, mock_convert):
     mock_convert.return_value = None
     result = copy("/test/root", ["video.mov"], "/test/archive", "test_prefix")
@@ -35,8 +35,8 @@ def test_copy_mov_conversion_failure(mock_logger, mock_convert):
     )
 
 
-@patch("src.importrr.archive.os.stat")
-@patch("src.importrr.archive.logger")
+@patch("importrr.archive.os.stat")
+@patch("importrr.archive.logger")
 def test_copy_oserror_on_stat(mock_logger, mock_stat):
     mock_stat.side_effect = OSError("Access denied")
     result = copy("/test/root", ["image.jpg"], "/test/archive", "test_prefix")
@@ -46,8 +46,8 @@ def test_copy_oserror_on_stat(mock_logger, mock_stat):
     )
 
 
-@patch("src.importrr.archive.create_tar")
-@patch("src.importrr.archive.os.stat")
+@patch("importrr.archive.create_tar")
+@patch("importrr.archive.os.stat")
 def test_copy_returns_true_on_full_success(mock_stat, mock_create_tar):
     mock_create_tar.return_value = ([], 2048)
     mock_stat_obj = MagicMock()
@@ -60,8 +60,8 @@ def test_copy_returns_true_on_full_success(mock_stat, mock_create_tar):
     mock_create_tar.assert_called_once()
 
 
-@patch("src.importrr.archive.create_tar")
-@patch("src.importrr.archive.os.stat")
+@patch("importrr.archive.create_tar")
+@patch("importrr.archive.os.stat")
 def test_copy_records_archive_metrics(mock_stat, mock_create_tar):
     # create_tar reports the real .tar size; the metric tracks that, not the
     # sum of the two 1024-byte source files.
@@ -79,9 +79,9 @@ def test_copy_records_archive_metrics(mock_stat, mock_create_tar):
     assert _archived_bytes("home") == before_bytes + 4096
 
 
-@patch("src.importrr.archive.create_tar")
-@patch("src.importrr.archive.os.stat")
-@patch("src.importrr.archive.MAX_SIZE", 1500)
+@patch("importrr.archive.create_tar")
+@patch("importrr.archive.os.stat")
+@patch("importrr.archive.MAX_SIZE", 1500)
 def test_copy_counts_early_archive_when_later_tar_raises(mock_stat, mock_create_tar):
     # Two archives worth of files; the second create_tar blows up. The first
     # archive was already written and must still be reflected in the metrics.
@@ -103,7 +103,7 @@ def test_copy_counts_early_archive_when_later_tar_raises(mock_stat, mock_create_
     assert _archived_bytes("home") == before_bytes + 500
 
 
-@patch("src.importrr.archive.create_tar")
+@patch("importrr.archive.create_tar")
 def test_copy_no_files_records_nothing(mock_create_tar):
     before_count = _archives_created("home")
     before_bytes = _archived_bytes("home")
@@ -115,9 +115,9 @@ def test_copy_no_files_records_nothing(mock_create_tar):
     assert _archived_bytes("home") == before_bytes
 
 
-@patch("src.importrr.archive.create_tar")
-@patch("src.importrr.archive.os.stat")
-@patch("src.importrr.archive.logger")
+@patch("importrr.archive.create_tar")
+@patch("importrr.archive.os.stat")
+@patch("importrr.archive.logger")
 def test_copy_returns_false_when_tar_member_missing(
     mock_logger, mock_stat, mock_create_tar
 ):
@@ -135,8 +135,8 @@ def test_copy_returns_false_when_tar_member_missing(
     )
 
 
-@patch("src.importrr.archive.create_tar")
-@patch("src.importrr.archive.os.stat")
+@patch("importrr.archive.create_tar")
+@patch("importrr.archive.os.stat")
 def test_copy_single_tar(mock_stat, mock_create_tar):
     # Mock stat to return a small size
     mock_stat_obj = MagicMock()
@@ -156,9 +156,9 @@ def test_copy_single_tar(mock_stat, mock_create_tar):
     )
 
 
-@patch("src.importrr.archive.create_tar")
-@patch("src.importrr.archive.os.stat")
-@patch("src.importrr.archive.MAX_SIZE", 1500)  # Override MAX_SIZE for testing
+@patch("importrr.archive.create_tar")
+@patch("importrr.archive.os.stat")
+@patch("importrr.archive.MAX_SIZE", 1500)  # Override MAX_SIZE for testing
 def test_copy_create_multiple_tars(mock_stat, mock_create_tar):
     # Mock stat to return sizes that will trigger multiple archives
     # First file: 1000
@@ -199,9 +199,9 @@ def test_copy_create_multiple_tars(mock_stat, mock_create_tar):
 # --- Tests for create_tar ---
 
 
-@patch("src.importrr.archive.os.path.getsize")
-@patch("src.importrr.archive.os.path.exists")
-@patch("src.importrr.archive.tarfile.open")
+@patch("importrr.archive.os.path.getsize")
+@patch("importrr.archive.os.path.exists")
+@patch("importrr.archive.tarfile.open")
 def test_create_tar_success(mock_tarfile_open, mock_exists, mock_getsize):
     mock_exists.return_value = True
     mock_getsize.return_value = 2048
@@ -230,10 +230,10 @@ def test_create_tar_success(mock_tarfile_open, mock_exists, mock_getsize):
     mock_getsize.assert_called_once_with(expected_tar_file)
 
 
-@patch("src.importrr.archive.logger")
-@patch("src.importrr.archive.os.path.getsize")
-@patch("src.importrr.archive.os.path.exists")
-@patch("src.importrr.archive.tarfile.open")
+@patch("importrr.archive.logger")
+@patch("importrr.archive.os.path.getsize")
+@patch("importrr.archive.os.path.exists")
+@patch("importrr.archive.tarfile.open")
 def test_create_tar_file_not_found(
     mock_tarfile_open, mock_exists, mock_getsize, mock_logger
 ):
@@ -267,8 +267,8 @@ def test_create_tar_file_not_found(
     assert archive_size == 1024
 
 
-@patch("src.importrr.archive.logger")
-@patch("src.importrr.archive.tarfile.open")
+@patch("importrr.archive.logger")
+@patch("importrr.archive.tarfile.open")
 def test_create_tar_exception(mock_tarfile_open, mock_logger):
     mock_tarfile_open.side_effect = PermissionError("Permission denied")
 

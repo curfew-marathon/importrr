@@ -2,10 +2,10 @@ from unittest.mock import call, patch
 
 import pytest
 
-from src.importrr.exifhelper import adjust_extensions
+from importrr.exifhelper import adjust_extensions
 
 
-@patch("src.importrr.exifhelper.run_exiftool")
+@patch("importrr.exifhelper.run_exiftool")
 def test_adjust_extensions_params(mock_run_exiftool):
     import_dir = "/test/import/dir"
     root_dir = "/test/root/dir"
@@ -46,13 +46,13 @@ def test_adjust_extensions_params(mock_run_exiftool):
         assert ext in actual_params  # ".jpeg"/".HEIC" would skip later passes otherwise
 
 
-@patch("src.importrr.exifhelper.run_exiftool")
+@patch("importrr.exifhelper.run_exiftool")
 @pytest.mark.parametrize("tag", ["CreationDate", "CreateDate"])
 def test_backfill_video_tag_params(mock_run_exiftool, tag):
     import_dir = "/test/import/dir"
     root_dir = "/test/root/dir"
 
-    from src.importrr.exifhelper import backfill_video_tag
+    from importrr.exifhelper import backfill_video_tag
 
     backfill_video_tag(import_dir, root_dir, tag)
 
@@ -74,14 +74,14 @@ def test_backfill_video_tag_params(mock_run_exiftool, tag):
     mock_run_exiftool.assert_called_once_with(root_dir, expected_params)
 
 
-@patch("src.importrr.exifhelper.run_exiftool")
+@patch("importrr.exifhelper.run_exiftool")
 def test_organize_params(mock_run_exiftool):
     import_dir = "/test/import/dir"
     root_dir = "/test/root/dir"
 
     mock_run_exiftool.return_value = "file1\nfile2\nfile3"
 
-    from src.importrr.exifhelper import organize
+    from importrr.exifhelper import organize
 
     result = organize(import_dir, root_dir)
 
@@ -97,12 +97,12 @@ def test_organize_params(mock_run_exiftool):
     assert result == ["file1", "file2", "file3"]
 
 
-@patch("src.importrr.exifhelper.run_exiftool")
+@patch("importrr.exifhelper.run_exiftool")
 def test_adjust_screenshots_params(mock_run_exiftool):
     import_dir = "/test/import/dir"
     root_dir = "/test/root/dir"
 
-    from src.importrr.exifhelper import (
+    from importrr.exifhelper import (
         _EMBEDDED_DATE_SOURCES,
         _IMAGE_EXTS,
         adjust_screenshots,
@@ -186,12 +186,12 @@ def test_adjust_screenshots_params(mock_run_exiftool):
     )
 
 
-@patch("src.importrr.exifhelper.metrics.DATES_GUESSED_FROM_MTIME_TOTAL")
-@patch("src.importrr.exifhelper.run_exiftool")
+@patch("importrr.exifhelper.metrics.DATES_GUESSED_FROM_MTIME_TOTAL")
+@patch("importrr.exifhelper.run_exiftool")
 def test_adjust_screenshots_warns_and_counts_mtime_guesses(
     mock_run_exiftool, mock_counter, caplog
 ):
-    from src.importrr.exifhelper import adjust_screenshots
+    from importrr.exifhelper import adjust_screenshots
 
     # Pass A returns anything; the probe (2nd call) returns two dateless names.
     mock_run_exiftool.side_effect = [None, "a.jpg\nb.png\n", None]
@@ -207,12 +207,12 @@ def test_adjust_screenshots_warns_and_counts_mtime_guesses(
     assert mock_counter.inc.call_count == 2
 
 
-@patch("src.importrr.exifhelper.metrics.DATES_GUESSED_FROM_MTIME_TOTAL")
-@patch("src.importrr.exifhelper.run_exiftool")
+@patch("importrr.exifhelper.metrics.DATES_GUESSED_FROM_MTIME_TOTAL")
+@patch("importrr.exifhelper.run_exiftool")
 def test_adjust_screenshots_no_guesses_when_probe_empty(
     mock_run_exiftool, mock_counter
 ):
-    from src.importrr.exifhelper import adjust_screenshots
+    from importrr.exifhelper import adjust_screenshots
 
     mock_run_exiftool.return_value = None  # probe finds nothing dateless
 
@@ -221,12 +221,12 @@ def test_adjust_screenshots_no_guesses_when_probe_empty(
     mock_counter.inc.assert_not_called()
 
 
-@patch("src.importrr.exifhelper.metrics.DATES_GUESSED_FROM_MTIME_TOTAL")
-@patch("src.importrr.exifhelper.run_exiftool")
+@patch("importrr.exifhelper.metrics.DATES_GUESSED_FROM_MTIME_TOTAL")
+@patch("importrr.exifhelper.run_exiftool")
 def test_adjust_screenshots_does_not_count_when_mtime_pass_fails(
     mock_run_exiftool, mock_counter, caplog
 ):
-    from src.importrr.exifhelper import adjust_screenshots
+    from importrr.exifhelper import adjust_screenshots
 
     # Pass A ok, probe finds a dateless file, Pass B raises.
     mock_run_exiftool.side_effect = [None, "a.jpg\n", RuntimeError("exiftool blew up")]
@@ -239,9 +239,9 @@ def test_adjust_screenshots_does_not_count_when_mtime_pass_fails(
     mock_counter.inc.assert_not_called()
 
 
-@patch("src.importrr.exifhelper.run_exiftool")
+@patch("importrr.exifhelper.run_exiftool")
 def test_images_missing_capture_date_parses_and_tolerates_empty(mock_run_exiftool):
-    from src.importrr.exifhelper import _images_missing_capture_date
+    from importrr.exifhelper import _images_missing_capture_date
 
     mock_run_exiftool.return_value = "one.jpg\ntwo.png\n\n"
     assert _images_missing_capture_date("/imp", "/root") == ["one.jpg", "two.png"]
@@ -250,8 +250,8 @@ def test_images_missing_capture_date_parses_and_tolerates_empty(mock_run_exiftoo
     assert _images_missing_capture_date("/imp", "/root") == []
 
 
-@patch("src.importrr.exifhelper.os.chdir")
-@patch("src.importrr.exifhelper.ExifToolHelper")
+@patch("importrr.exifhelper.os.chdir")
+@patch("importrr.exifhelper.ExifToolHelper")
 @pytest.mark.parametrize(
     "returncode, stdout, stderr, on_error, should_raise",
     [
@@ -272,7 +272,7 @@ def test_run_exiftool_error_handling(
 ):
     from exiftool.exceptions import ExifToolExecuteError
 
-    from src.importrr.exifhelper import run_exiftool
+    from importrr.exifhelper import run_exiftool
 
     # To support both the local mock ExifToolExecuteError which takes any args
     # and the real pyexiftool which expects (status, cmd_stdout, cmd_stderr, params),
@@ -303,13 +303,13 @@ def test_run_exiftool_error_handling(
 
 def _classify_with(tag_dicts):
     with (
-        patch("src.importrr.exifhelper.os.chdir"),
-        patch("src.importrr.exifhelper.ExifToolHelper") as mock_helper,
+        patch("importrr.exifhelper.os.chdir"),
+        patch("importrr.exifhelper.ExifToolHelper") as mock_helper,
     ):
         et = mock_helper.return_value.__enter__.return_value
         et.get_tags.return_value = tag_dicts
 
-        from src.importrr.exifhelper import classify_unprocessed
+        from importrr.exifhelper import classify_unprocessed
 
         return classify_unprocessed("/album", "/album/import/20260905184400", NAMES)
 
@@ -354,12 +354,12 @@ def test_classify_unprocessed_classifies_every_name():
     # No name is special-cased: even a file called "manifest.yml" gets a reason
     # (make_work_dir renames such collisions before we get here).
     with (
-        patch("src.importrr.exifhelper.os.chdir"),
-        patch("src.importrr.exifhelper.ExifToolHelper") as mock_helper,
+        patch("importrr.exifhelper.os.chdir"),
+        patch("importrr.exifhelper.ExifToolHelper") as mock_helper,
     ):
         mock_helper.return_value.__enter__.return_value.get_tags.return_value = []
 
-        from src.importrr.exifhelper import classify_unprocessed
+        from importrr.exifhelper import classify_unprocessed
 
         result = classify_unprocessed(
             "/album",
@@ -378,8 +378,8 @@ def test_classify_unprocessed_survives_exiftool_error(caplog):
     from exiftool.exceptions import ExifToolExecuteError
 
     with (
-        patch("src.importrr.exifhelper.os.chdir"),
-        patch("src.importrr.exifhelper.ExifToolHelper") as mock_helper,
+        patch("importrr.exifhelper.os.chdir"),
+        patch("importrr.exifhelper.ExifToolHelper") as mock_helper,
     ):
         et = mock_helper.return_value.__enter__.return_value
         try:
@@ -388,7 +388,7 @@ def test_classify_unprocessed_survives_exiftool_error(caplog):
             err = ExifToolExecuteError(1)
         et.get_tags.side_effect = err
 
-        from src.importrr.exifhelper import classify_unprocessed
+        from importrr.exifhelper import classify_unprocessed
 
         result = classify_unprocessed("/album", "/work", ["a.mov"])
 
@@ -401,7 +401,7 @@ def test_classify_unprocessed_survives_exiftool_error(caplog):
 
 
 def test_classify_unprocessed_empty():
-    from src.importrr.exifhelper import classify_unprocessed
+    from importrr.exifhelper import classify_unprocessed
 
     assert classify_unprocessed("/album", "/work", []) == []
 
@@ -425,6 +425,6 @@ def test_classify_unprocessed_empty():
     ],
 )
 def test_media_type_for(path, expected):
-    from src.importrr.exifhelper import media_type_for
+    from importrr.exifhelper import media_type_for
 
     assert media_type_for(path) == expected
