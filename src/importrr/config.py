@@ -1,6 +1,7 @@
 import logging
 import os.path
 from configparser import ConfigParser
+from typing import Any
 
 CANDIDATES = ["config.ini", "/config/config.ini"]
 
@@ -8,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 
 class Config:
-    def __init__(self):
+    def __init__(self) -> None:
         parser = ConfigParser()
 
         # Try to find and read config file
@@ -38,7 +39,7 @@ class Config:
         logger.info(f"Album root directory: {self.album_root}")
         logger.info(f"Archive root directory: {self.archive_root}")
 
-        self.data = []
+        self.data: list[dict[str, Any]] = []
 
         for section_name in parser.sections():
             if "global" == section_name:
@@ -81,14 +82,14 @@ class Config:
 
         logger.info(f"Configuration loaded successfully with {len(self.data)} sections")
 
-    def get_album(self):
+    def get_album(self) -> str:
         return self.album_root
 
-    def get_data(self):
+    def get_data(self) -> list[dict[str, Any]]:
         return self.data
 
-    def get_serial(self, d):
+    def get_serial(self, d: str) -> str | None:
         for item in self.data:
-            if d == item.get("archive"):
+            if item.get("archive") == d:
                 return item.get("serial")
-        raise KeyError("No serial for " + d)
+        raise KeyError(f"No serial for {d}")

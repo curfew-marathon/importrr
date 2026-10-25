@@ -1,20 +1,7 @@
 import os
 from unittest.mock import patch
 
-import pytest
-
 from importrr.sort import Sort
-
-
-@pytest.fixture
-def mock_directories(tmp_path):
-    root_dir = tmp_path / "root"
-    root_dir.mkdir()
-
-    archive_dir = tmp_path / "archive"
-    archive_dir.mkdir()
-
-    return root_dir, archive_dir
 
 
 @patch("importrr.sort.get_media_files")

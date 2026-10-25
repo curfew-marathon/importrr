@@ -17,7 +17,7 @@ TIME_CUTOFF = 2
 MANIFEST_NAME = "manifest.yml"
 
 
-def _skip_category(reason):
+def _skip_category(reason: str) -> str:
     """Collapse classify_unprocessed's free-text reason into the small,
     bounded set of label values importrr_files_skipped_total accepts.
 
@@ -33,7 +33,7 @@ def _skip_category(reason):
     return "other"
 
 
-def cleanup(work_dir):
+def cleanup(work_dir: str) -> None:
     """Delete work_dir only when it holds nothing but (optionally) the manifest.
 
     If any media files remain, leave the directory *and* the manifest untouched
@@ -69,7 +69,13 @@ def cleanup(work_dir):
         logger.error(f"Failed to remove directory {work_dir}: {e}")
 
 
-def write_manifest(root_dir, work_dir, batch_id, entries, skipped=None):
+def write_manifest(
+    root_dir: str,
+    work_dir: str,
+    batch_id: str,
+    entries: list[dict[str, str]],
+    skipped: list[dict[str, str]] | None = None,
+) -> None:
     """Persist the batch (what is about to be transcoded and archived) as YAML.
 
     ``skipped`` is a list of ``{"name", "reason"}`` for files that were staged
@@ -113,7 +119,7 @@ def write_manifest(root_dir, work_dir, batch_id, entries, skipped=None):
             pass
 
 
-def sort_media(root_dir, import_dir):
+def sort_media(root_dir: str, import_dir: str) -> list[dict[str, str]]:
     """Run the ExifTool sort phase and return one entry per organized file.
 
     Each entry is ``{"original_name": <name entering organize()>, "album_path":
@@ -142,7 +148,9 @@ def sort_media(root_dir, import_dir):
                             "album_path": s.strip(),
                         }
                     )
-            except IndexError:
+            except IndexError:  # pragma: no cover - string slicing never
+                # raises IndexError in CPython; kept as defensive code in case
+                # the parsing above this line ever changes.
                 logger.warning(f"Failed to parse ExifTool output line: {split}")
                 continue
 
@@ -150,7 +158,7 @@ def sort_media(root_dir, import_dir):
     return result
 
 
-def get_media_files(import_dir, time_cutoff):
+def get_media_files(import_dir: str, time_cutoff: float) -> list[str]:
     if not os.path.exists(import_dir):
         logger.warning(f"Import directory does not exist: {import_dir}")
         return []
@@ -197,7 +205,7 @@ def get_media_files(import_dir, time_cutoff):
     return result
 
 
-def make_work_dir(cur_dir, work_dir, file_list):
+def make_work_dir(cur_dir: str, work_dir: str, file_list: list[str]) -> None:
     if not file_list:
         logger.debug("No files to move, skipping work directory creation")
         return
@@ -246,7 +254,7 @@ def make_work_dir(cur_dir, work_dir, file_list):
         raise
 
 
-def last_accessed(file):
+def last_accessed(file: str) -> float:
     created = os.stat(file).st_ctime
     modified = os.stat(file).st_mtime
     accessed = os.stat(file).st_atime
@@ -254,7 +262,12 @@ def last_accessed(file):
 
 
 class Sort:
-    def __init__(self, root_dir, archive_dir=None, section=None):
+    def __init__(
+        self,
+        root_dir: str,
+        archive_dir: str | None = None,
+        section: str | None = None,
+    ) -> None:
         if not os.path.isdir(root_dir):
             raise OSError("Directory doesn't exist " + root_dir)
         if archive_dir is not None and not os.path.isdir(archive_dir):
@@ -265,7 +278,86 @@ class Sort:
         # name for callers that construct Sort directly (e.g. tests).
         self.section = section or os.path.basename(os.path.normpath(root_dir))
 
-    def launch(self, import_dir):
+    def _validate_import_dir(self, import_dir: str) -> str | None:
+        """Resolve import_dir against root_dir, rejecting any path that
+        escapes it. Returns None (and logs) on a rejected path."""
+        abs_root_dir = os.path.abspath(self.root_dir)
+        abs_import_dir = os.path.abspath(os.path.join(abs_root_dir, import_dir))
+
+        if os.path.commonpath([abs_root_dir, abs_import_dir]) != abs_root_dir:
+            logger.error(f"Path traversal attempt detected: {import_dir}")
+            return None
+        return abs_import_dir
+
+    def _organize_batch(
+        self, import_dir: str, prefix: str, result: list[str]
+    ) -> tuple[str, list[str]]:
+        """Stage, sort, and write the manifest for one batch of files.
+
+        Returns the batch's work_dir and the album-relative paths of the
+        files that were organized (for the later archive phase).
+        """
+        work_dir = os.path.join(import_dir, prefix)
+        make_work_dir(import_dir, work_dir, result)
+        entries = sort_media(self.root_dir, work_dir)  # Use work_dir directly
+        sorted_media = [entry["album_path"] for entry in entries]
+        for entry in entries:
+            media_type = exifhelper.media_type_for(entry["album_path"])
+            metrics.FILES_ORGANIZED_TOTAL.labels(
+                section=self.section, media_type=media_type
+            ).inc()
+
+        remaining_files = os.listdir(work_dir) if os.path.exists(work_dir) else []
+        metrics.WORKDIR_LEFTOVER_FILES.labels(section=self.section).set(
+            len(remaining_files)
+        )
+        skipped: list[dict[str, str]] = []
+        if remaining_files:
+            # Per-file reason for each unorganized file; also logged.
+            skipped = exifhelper.classify_unprocessed(
+                self.root_dir, work_dir, remaining_files
+            )
+            for item in skipped:
+                metrics.FILES_SKIPPED_TOTAL.labels(
+                    section=self.section,
+                    reason=_skip_category(item["reason"]),
+                ).inc()
+            logger.warning(
+                f"Unable to process {len(remaining_files)} files - they remain in {work_dir}"
+            )
+        else:
+            logger.info("Successfully processed all files")
+
+        # Write-Ahead Log: record the batch before the slow, crash-prone
+        # transcode + archive phase so it can be recovered after a hard kill.
+        if os.path.isdir(work_dir):
+            write_manifest(self.root_dir, work_dir, prefix, entries, skipped)
+
+        return work_dir, sorted_media
+
+    def _archive_batch(self, sorted_media: list[str], prefix: str) -> bool:
+        """Archive the batch's sorted files. Returns whether every file was
+        archived; re-raises after counting the failure on an archive error."""
+        archive_complete = True
+        if self.archive_dir is not None:
+            logger.info(f"Creating archive with {len(sorted_media)} files")
+            try:
+                archive_complete = archive.copy(
+                    self.root_dir,
+                    sorted_media,
+                    self.archive_dir,
+                    prefix,
+                    self.section,
+                )
+            except Exception:
+                # A tar or file-I/O error leaves the batch unarchived just as
+                # a False return does; count it before it propagates so the
+                # metric does not silently miss it.
+                metrics.ARCHIVE_INCOMPLETE_TOTAL.labels(section=self.section).inc()
+                raise
+        return archive_complete
+
+    def launch(self, import_dir: str) -> None:
         """Sort a batch, write its manifest, archive it, then clean up.
 
         Order is strict: sort -> write manifest -> transcode + archive ->
@@ -276,80 +368,24 @@ class Sort:
         time_cutoff = start - 60 * TIME_CUTOFF
         prefix = datetime.fromtimestamp(time_cutoff).strftime("%Y%m%d%H%M%S")  # noqa: DTZ006
 
-        abs_root_dir = os.path.abspath(self.root_dir)
-        abs_import_dir = os.path.abspath(os.path.join(abs_root_dir, import_dir))
-
-        if os.path.commonpath([abs_root_dir, abs_import_dir]) != abs_root_dir:
-            logger.error(f"Path traversal attempt detected: {import_dir}")
+        resolved_import_dir = self._validate_import_dir(import_dir)
+        if resolved_import_dir is None:
             return
 
-        import_dir = abs_import_dir
-        result = []
+        result: list[str] = []
         # finally: record the batch duration even when a step below raises, so
         # slow archive/transcode failures still land in the histogram.
         try:
-            result = get_media_files(import_dir, time_cutoff)
+            result = get_media_files(resolved_import_dir, time_cutoff)
             metrics.FILES_DISCOVERED_TOTAL.labels(section=self.section).inc(len(result))
 
             if result:
                 logger.info(f"Processing {len(result)} files")
-                work_dir = os.path.join(import_dir, prefix)
-                make_work_dir(import_dir, work_dir, result)
-                entries = sort_media(self.root_dir, work_dir)  # Use work_dir directly
-                sorted_media = [entry["album_path"] for entry in entries]
-                for entry in entries:
-                    media_type = exifhelper.media_type_for(entry["album_path"])
-                    metrics.FILES_ORGANIZED_TOTAL.labels(
-                        section=self.section, media_type=media_type
-                    ).inc()
-
-                remaining_files = (
-                    os.listdir(work_dir) if os.path.exists(work_dir) else []
+                work_dir, sorted_media = self._organize_batch(
+                    resolved_import_dir, prefix, result
                 )
-                metrics.WORKDIR_LEFTOVER_FILES.labels(section=self.section).set(
-                    len(remaining_files)
-                )
-                skipped = []
-                if remaining_files:
-                    # Per-file reason for each unorganized file; also logged.
-                    skipped = exifhelper.classify_unprocessed(
-                        self.root_dir, work_dir, remaining_files
-                    )
-                    for item in skipped:
-                        metrics.FILES_SKIPPED_TOTAL.labels(
-                            section=self.section,
-                            reason=_skip_category(item["reason"]),
-                        ).inc()
-                    logger.warning(
-                        f"Unable to process {len(remaining_files)} files - they remain in {work_dir}"
-                    )
-                else:
-                    logger.info("Successfully processed all files")
 
-                # Write-Ahead Log: record the batch before the slow, crash-prone
-                # transcode + archive phase so it can be recovered after a hard kill.
-                if os.path.isdir(work_dir):
-                    write_manifest(self.root_dir, work_dir, prefix, entries, skipped)
-
-                archive_complete = True
-                if self.archive_dir is not None:
-                    logger.info(f"Creating archive with {len(sorted_media)} files")
-                    try:
-                        archive_complete = archive.copy(
-                            self.root_dir,
-                            sorted_media,
-                            self.archive_dir,
-                            prefix,
-                            self.section,
-                        )
-                    except Exception:
-                        # A tar or file-I/O error leaves the batch unarchived
-                        # just as a False return does; count it before it
-                        # propagates so the metric does not silently miss it.
-                        metrics.ARCHIVE_INCOMPLETE_TOTAL.labels(
-                            section=self.section
-                        ).inc()
-                        raise
+                archive_complete = self._archive_batch(sorted_media, prefix)
 
                 # Safe cleanup runs only after a fully successful archive. On a
                 # partial failure the work_dir and its manifest are kept so the

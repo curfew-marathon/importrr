@@ -1,5 +1,4 @@
 import os
-import unittest
 from unittest.mock import patch
 
 import pytest
@@ -7,18 +6,18 @@ import pytest
 from importrr.config import Config
 
 
-class TestConfig(unittest.TestCase):
-    def test_no_config_file(self):
-        with self.assertRaises(FileNotFoundError):
-            Config()
+def test_no_config_file():
+    with pytest.raises(FileNotFoundError):
+        Config()
 
-    @patch("importrr.config.os.path.exists", return_value=True)
-    @patch("importrr.config.ConfigParser.sections", return_value=[])
-    def test_missing_global_section(self, mock_sections, mock_exists):
-        with self.assertRaisesRegex(
-            ValueError, "Missing required 'global' section in configuration"
-        ):
-            Config()
+
+@patch("importrr.config.os.path.exists", return_value=True)
+@patch("importrr.config.ConfigParser.sections", return_value=[])
+def test_missing_global_section(mock_sections, mock_exists):
+    with pytest.raises(
+        ValueError, match="Missing required 'global' section in configuration"
+    ):
+        Config()
 
 
 def test_parses_valid_config(tmp_path, monkeypatch):

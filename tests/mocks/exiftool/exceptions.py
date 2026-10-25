@@ -1,2 +1,0 @@
-class ExifToolExecuteError(Exception):
-    pass

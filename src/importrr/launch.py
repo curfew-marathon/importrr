@@ -3,6 +3,7 @@ import os
 import signal
 import sys
 from datetime import datetime
+from types import FrameType
 
 from apscheduler.schedulers.blocking import BlockingScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -20,7 +21,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def main_process():
+def main_process() -> int:
     """Run one full pass over every configuration section.
 
     Returns the number of sections that raised. A per-section failure is logged
@@ -68,14 +69,14 @@ def main_process():
 
 
 class ImportrrScheduler:
-    def __init__(self):
+    def __init__(self) -> None:
         self.scheduler = BlockingScheduler()
         self.setup_signal_handlers()
 
-    def setup_signal_handlers(self):
+    def setup_signal_handlers(self) -> None:
         """Setup graceful shutdown handlers"""
 
-        def signal_handler(signum, frame):
+        def signal_handler(signum: int, frame: FrameType | None) -> None:
             logger.info(f"Received signal {signum}, shutting down gracefully...")
             self.scheduler.shutdown()
             sys.exit(0)
@@ -83,7 +84,7 @@ class ImportrrScheduler:
         signal.signal(signal.SIGINT, signal_handler)
         signal.signal(signal.SIGTERM, signal_handler)
 
-    def run_import_job(self):
+    def run_import_job(self) -> None:
         """Wrapper function to run the import process with proper logging"""
         job_start = datetime.now()  # noqa: DTZ005
         logger.info("=" * 60)
@@ -125,7 +126,7 @@ class ImportrrScheduler:
             logger.error("=" * 60)
             # Don't re-raise - we want the scheduler to continue running
 
-    def start(self):
+    def start(self) -> None:
         """Start the scheduler"""
         try:
             # Add the job - every 2 hours from 8 AM to 10 PM
@@ -160,9 +161,13 @@ class ImportrrScheduler:
             sys.exit(1)
 
 
-if __name__ == "__main__":
+def _run() -> None:
     logger.info("Starting importrr scheduler service")
     if os.getenv("METRICS_ENABLED", "true").lower() in ("1", "true", "yes"):
         metrics.start(os.getenv("METRICS_PORT", "9130"))
     scheduler = ImportrrScheduler()
     scheduler.start()
+
+
+if __name__ == "__main__":
+    _run()

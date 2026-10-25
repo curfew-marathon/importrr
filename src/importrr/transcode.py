@@ -10,7 +10,7 @@ FFMPEG_PARAMS = "-c:v libx264 -preset slower -crf 20 -c:a aac -b:a 160k -vf form
 logger = logging.getLogger(__name__)
 
 
-def convert(root_dir, source_file):
+def convert(root_dir: str, source_file: str) -> str | None:
     logger.info(f"Converting MOV to MP4: {source_file}")
     result = source_file[:-3] + "mp4"
     output_file = os.path.join(root_dir, result)
@@ -49,7 +49,7 @@ def convert(root_dir, source_file):
         return None  # Return None to skip file if conversion fails
 
 
-def transcode(input_file, output_file):
+def transcode(input_file: str, output_file: str) -> None:
     logger.debug(f"Starting FFmpeg transcoding: {input_file} -> {output_file}")
     try:
         ff = ffmpy.FFmpeg(
@@ -60,10 +60,12 @@ def transcode(input_file, output_file):
         logger.debug("FFmpeg transcoding completed successfully")
     except ffmpy.FFRuntimeError as e:
         logger.error(f"FFmpeg failed with exit code: {e.exit_code}")
+        # e.stdout/e.stderr are bytes | str | None; logged as-is (bytes render
+        # as "b'...'") to preserve today's exact output.
         if e.stdout:
-            logger.error(f"FFmpeg stdout: {e.stdout}")
+            logger.error(f"FFmpeg stdout: {e.stdout}")  # type: ignore[str-bytes-safe]
         if e.stderr:
-            logger.error(f"FFmpeg stderr: {e.stderr}")
+            logger.error(f"FFmpeg stderr: {e.stderr}")  # type: ignore[str-bytes-safe]
         # Safely remove output file if it exists
         if os.path.exists(output_file):
             os.remove(output_file)
