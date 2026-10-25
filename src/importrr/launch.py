@@ -160,7 +160,7 @@ class ImportrrScheduler:
             logger.info("Starting scheduled runs...")
             self.scheduler.start()
 
-        except KeyboardInterrupt, SystemExit:
+        except (KeyboardInterrupt, SystemExit):
             logger.info("Scheduler shutdown requested")
         except Exception as e:
             logger.error(f"Scheduler error: {e}")
