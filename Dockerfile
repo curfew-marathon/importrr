@@ -1,4 +1,4 @@
-FROM python:alpine
+FROM python:3.15-alpine
 
 # Set the stage
 LABEL maintainer="curfew-marathon"

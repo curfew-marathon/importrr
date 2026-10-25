@@ -21,10 +21,10 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v7
 
-    - name: Set up Python 3.11
+    - name: Set up Python 3.15
       uses: actions/setup-python@v7
       with:
-        python-version: "3.11"
+        python-version: "3.15"
 
     - name: Install dependencies
       run: |
@@ -49,7 +49,7 @@ jobs:
       env:
         PYTHONPATH: src
       run: |
-        pytest --cov=src --cov-report=term-missing --cov-fail-under=80
+        pytest --cov=src --cov-report=term-missing --cov-fail-under=99
 
   compose-check:
     name: Docker Compose Config Check
