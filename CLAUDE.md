@@ -4,8 +4,9 @@ importrr automates importing image/movie files into a photo library, wrapping
 Phil Harvey's ExifTool. See [README.md](README.md) for the full workflow and
 config.
 
-CI (Python 3.11): `ruff check .`, `ruff format --check .`, `mypy .`,
-`pytest --cov` (with `PYTHONPATH=src`).
+CI (Python 3.15): `ruff check .`, `ruff format --check .`, `mypy .`,
+`pytest --cov` (with `PYTHONPATH=src`). Coverage floor is 99%, enforced by
+`fail_under` in `pyproject.toml` and `--cov-fail-under` in CI.
 
 ## Canonical run scripts
 

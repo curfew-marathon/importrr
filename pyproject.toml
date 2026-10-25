@@ -2,7 +2,7 @@
 explicit_package_bases = true
 ignore_missing_imports = true
 mypy_path = "src"
-python_version = "3.11"
+python_version = "3.15"
 
 [[tool.mypy.overrides]]
 module = "importrr.metrics"
@@ -40,7 +40,7 @@ disallow_untyped_defs = true
 disallow_incomplete_defs = true
 
 [tool.ruff]
-target-version = "py311"
+target-version = "py315"
 
 [tool.ruff.lint]
 select = ["E4", "E7", "E9", "F"]
@@ -52,4 +52,4 @@ testpaths = ["tests"]
 source = ["src"]
 
 [tool.coverage.report]
-fail_under = 80
+fail_under = 99
