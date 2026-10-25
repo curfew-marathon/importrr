@@ -35,6 +35,29 @@ def test_copy_mov_conversion_failure(mock_logger, mock_convert):
     )
 
 
+@patch("importrr.archive.create_tar")
+@patch("importrr.archive.os.stat")
+@patch("importrr.archive.transcode.convert")
+def test_copy_mov_conversion_success_archives_converted_file(
+    mock_convert, mock_stat, mock_create_tar
+):
+    # On a successful conversion the .mov name is swapped for the converted
+    # name before stat/archiving, not archived under its original extension.
+    mock_convert.return_value = "video.mp4"
+    mock_create_tar.return_value = ([], 1024)
+    mock_stat_obj = MagicMock()
+    mock_stat_obj.st_size = 1024
+    mock_stat.return_value = mock_stat_obj
+
+    result = copy("/test/root", ["video.mov"], "/test/archive", "test_prefix")
+
+    assert result is True
+    mock_convert.assert_called_once_with("/test/root", "video.mov")
+    mock_create_tar.assert_called_once_with(
+        "/test/root", ["video.mp4"], "/test/archive", "test_prefix", 0
+    )
+
+
 @patch("importrr.archive.os.stat")
 @patch("importrr.archive.logger")
 def test_copy_oserror_on_stat(mock_logger, mock_stat):

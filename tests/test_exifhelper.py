@@ -74,6 +74,37 @@ def test_backfill_video_tag_params(mock_run_exiftool, tag):
     mock_run_exiftool.assert_called_once_with(root_dir, expected_params)
 
 
+@patch("importrr.exifhelper.backfill_video_tag")
+def test_backfill_videos_runs_creationdate_then_createdate(mock_backfill_video_tag):
+    from importrr.exifhelper import backfill_videos
+
+    backfill_videos("/test/import/dir", "/test/root/dir")
+
+    mock_backfill_video_tag.assert_has_calls(
+        [
+            call("/test/import/dir", "/test/root/dir", "CreationDate"),
+            call("/test/import/dir", "/test/root/dir", "CreateDate"),
+        ]
+    )
+
+
+@patch("importrr.exifhelper.run_exiftool")
+def test_copy_tags_params(mock_run_exiftool):
+    from importrr.exifhelper import copy_tags
+
+    copy_tags("/test/root/dir", "/import/in.heic", "/import/out.jpg")
+
+    expected_params = [
+        "-overwrite_original",
+        "-TagsFromFile",
+        "/import/in.heic",
+        "-all:all>all:all",
+        "/import/out.jpg",
+    ]
+
+    mock_run_exiftool.assert_called_once_with("/test/root/dir", expected_params)
+
+
 @patch("importrr.exifhelper.run_exiftool")
 def test_organize_params(mock_run_exiftool):
     import_dir = "/test/import/dir"
@@ -239,6 +270,31 @@ def test_adjust_screenshots_does_not_count_when_mtime_pass_fails(
     mock_counter.inc.assert_not_called()
 
 
+@patch("importrr.exifhelper.metrics.DATES_GUESSED_FROM_MTIME_TOTAL")
+@patch("importrr.exifhelper._images_missing_capture_date")
+@patch("importrr.exifhelper.run_exiftool")
+def test_adjust_screenshots_survives_probe_failure(
+    mock_run_exiftool, mock_probe, mock_counter, caplog
+):
+    from importrr.exifhelper import adjust_screenshots
+
+    # Pass A and Pass B both succeed; the probe in between blows up. The
+    # batch must still be stamped by Pass B, just with no mtime-guess count.
+    mock_run_exiftool.side_effect = [None, None]
+    mock_probe.side_effect = RuntimeError("exiftool blew up")
+
+    with caplog.at_level("WARNING"):
+        adjust_screenshots("/imp", "/root")
+
+    assert mock_run_exiftool.call_count == 2  # Pass A and Pass B both ran
+    assert any(
+        "Could not enumerate dateless files before mtime pass" in r.message
+        for r in caplog.records
+    )
+    assert not any("using file mtime" in r.message for r in caplog.records)
+    mock_counter.inc.assert_not_called()
+
+
 @patch("importrr.exifhelper.run_exiftool")
 def test_images_missing_capture_date_parses_and_tolerates_empty(mock_run_exiftool):
     from importrr.exifhelper import _images_missing_capture_date
@@ -248,6 +304,21 @@ def test_images_missing_capture_date_parses_and_tolerates_empty(mock_run_exiftoo
 
     mock_run_exiftool.return_value = None  # exiftool exit 2 -> run_exiftool -> None
     assert _images_missing_capture_date("/imp", "/root") == []
+
+
+@patch("importrr.exifhelper.os.chdir")
+@patch("importrr.exifhelper.ExifToolHelper")
+def test_run_exiftool_returns_result_on_success(mock_exiftool_helper, mock_chdir):
+    from importrr.exifhelper import run_exiftool
+
+    mock_context = mock_exiftool_helper.return_value.__enter__.return_value
+    mock_context.execute.return_value = "file1\nfile2"
+
+    result = run_exiftool("/test/root", ["-test", "-param"])
+
+    assert result == "file1\nfile2"
+    mock_chdir.assert_called_once_with("/test/root")
+    mock_context.execute.assert_called_once_with("-test", "-param")
 
 
 @patch("importrr.exifhelper.os.chdir")
