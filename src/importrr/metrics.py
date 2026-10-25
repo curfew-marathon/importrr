@@ -116,12 +116,15 @@ TRANSCODE_OUTPUT_BYTES_TOTAL = Counter(
 )
 
 
-def start(port):
+def start(port: int | str | None) -> None:
     """Start the metrics HTTP server. Never raises: a bad port value, a
     collision, or any other startup failure is logged and swallowed so a
     metrics problem can never take the daemon down."""
     try:
-        start_http_server(int(port))
+        # None/non-numeric str deliberately reach here; the resulting
+        # TypeError/ValueError is caught below, per this function's
+        # "never raises" contract.
+        start_http_server(int(port))  # type: ignore[arg-type]
         logger.info("Metrics server listening on :%s/metrics", port)
     except Exception as e:  # noqa: BLE001 - startup failures are explicitly non-fatal
         logger.error(

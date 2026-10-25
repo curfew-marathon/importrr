@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from importrr import metrics
-from importrr.launch import ImportrrScheduler, main_process
+from importrr.launch import ImportrrScheduler, _run, main_process
 
 
 def _job_runs(outcome):
@@ -138,3 +138,44 @@ def test_start_handles_keyboard_interrupt_gracefully():
     scheduler.scheduler.start.side_effect = KeyboardInterrupt()
 
     scheduler.start()  # must not raise or exit
+
+
+@patch("importrr.launch.ImportrrScheduler")
+@patch("importrr.launch.metrics.start")
+def test_run_starts_metrics_by_default(
+    mock_metrics_start, mock_scheduler_cls, monkeypatch
+):
+    monkeypatch.delenv("METRICS_ENABLED", raising=False)
+    monkeypatch.delenv("METRICS_PORT", raising=False)
+
+    _run()
+
+    mock_metrics_start.assert_called_once_with("9130")
+    mock_scheduler_cls.return_value.start.assert_called_once()
+
+
+@patch("importrr.launch.ImportrrScheduler")
+@patch("importrr.launch.metrics.start")
+def test_run_starts_metrics_on_configured_port(
+    mock_metrics_start, mock_scheduler_cls, monkeypatch
+):
+    monkeypatch.setenv("METRICS_ENABLED", "true")
+    monkeypatch.setenv("METRICS_PORT", "9999")
+
+    _run()
+
+    mock_metrics_start.assert_called_once_with("9999")
+    mock_scheduler_cls.return_value.start.assert_called_once()
+
+
+@patch("importrr.launch.ImportrrScheduler")
+@patch("importrr.launch.metrics.start")
+def test_run_skips_metrics_when_disabled(
+    mock_metrics_start, mock_scheduler_cls, monkeypatch
+):
+    monkeypatch.setenv("METRICS_ENABLED", "false")
+
+    _run()
+
+    mock_metrics_start.assert_not_called()
+    mock_scheduler_cls.return_value.start.assert_called_once()

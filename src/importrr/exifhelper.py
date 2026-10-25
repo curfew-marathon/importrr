@@ -1,5 +1,6 @@
 import logging
 import os
+from collections.abc import Iterable
 
 from exiftool import ExifToolHelper
 from exiftool.exceptions import ExifToolExecuteError
@@ -38,7 +39,7 @@ _IMAGE_EXTS = ("GIF", "JPG", "PNG", "HEIC", "HEIF")
 _VIDEO_EXTS = ("MOV", "MP4", "3GP")
 
 
-def media_type_for(path):
+def media_type_for(path: str) -> str:
     """Classify an organized file's final extension as "image", "video", or
     "other", for per-media-type metrics.
 
@@ -54,14 +55,14 @@ def media_type_for(path):
     return "other"
 
 
-def _ext_args(exts):
+def _ext_args(exts: Iterable[str]) -> list[str]:
     args = []
     for ext in exts:
         args += ["-ext", ext]
     return args
 
 
-def organize(import_dir, root_dir):
+def organize(import_dir: str, root_dir: str) -> list[str]:
     logger.info("Organizing files by date and renaming")
     logger.debug(f"Processing files in: {import_dir}")
     # verbose because we need to get the new names of the files
@@ -75,12 +76,13 @@ def organize(import_dir, root_dir):
 
     output = run_exiftool(root_dir, params, False)
     # split string
-    splits = output.split("\n")
+    splits = output.split("\n")  # type: ignore[union-attr]  # on_error=False path
+    # always returns a str here in practice; see run_exiftool.
     logger.debug(f"ExifTool returned {len(splits)} output lines")
     return splits
 
 
-def adjust_extensions(import_dir, root_dir):
+def adjust_extensions(import_dir: str, root_dir: str) -> None:
     logger.info("Adjusting file extensions based on MIME types")
     logger.debug(f"Processing files in: {import_dir}")
     # adjust the names of the files based on their MIME type so Exiftool doesn't
@@ -97,7 +99,7 @@ def adjust_extensions(import_dir, root_dir):
     run_exiftool(root_dir, params)
 
 
-def adjust_screenshots(import_dir, root_dir):
+def adjust_screenshots(import_dir: str, root_dir: str) -> None:
     """Give still images (:data:`_IMAGE_EXTS`) a DateTimeOriginal when they
     arrive without one.
 
@@ -151,7 +153,7 @@ def adjust_screenshots(import_dir, root_dir):
         metrics.DATES_GUESSED_FROM_MTIME_TOTAL.inc()
 
 
-def _images_missing_capture_date(import_dir, root_dir):
+def _images_missing_capture_date(import_dir: str, root_dir: str) -> list[str]:
     """Basenames of still images (:data:`_IMAGE_EXTS`) under ``import_dir`` that
     still have no ``DateTimeOriginal``.
 
@@ -176,7 +178,7 @@ def _images_missing_capture_date(import_dir, root_dir):
     return [line.strip() for line in output.splitlines() if line.strip()]
 
 
-def copy_tags(root_dir, input_file, output_file):
+def copy_tags(root_dir: str, input_file: str, output_file: str) -> None:
     logger.debug(f"Copying EXIF tags: {input_file} -> {output_file}")
     params = [
         "-overwrite_original",
@@ -189,13 +191,13 @@ def copy_tags(root_dir, input_file, output_file):
     run_exiftool(root_dir, params)
 
 
-def backfill_videos(import_dir, root_dir):
+def backfill_videos(import_dir: str, root_dir: str) -> None:
     logger.info("Backfilling video metadata dates")
     backfill_video_tag(import_dir, root_dir, "CreationDate")
     backfill_video_tag(import_dir, root_dir, "CreateDate")
 
 
-def backfill_video_tag(import_dir, root_dir, tag):
+def backfill_video_tag(import_dir: str, root_dir: str, tag: str) -> None:
     logger.debug(f"Backfilling video dates using {tag} metadata")
     params = [
         "-overwrite_original",
@@ -214,7 +216,9 @@ def backfill_video_tag(import_dir, root_dir, tag):
     run_exiftool(root_dir, params)
 
 
-def classify_unprocessed(root_dir, work_dir, names):
+def classify_unprocessed(
+    root_dir: str, work_dir: str, names: list[str]
+) -> list[dict[str, str]]:
     """Explain why each still-present file was not organized.
 
     ``names`` is the raw ``os.listdir(work_dir)`` after the sort phase - the
@@ -263,7 +267,7 @@ def classify_unprocessed(root_dir, work_dir, names):
     return skipped
 
 
-def run_exiftool(root_dir, params, on_error=True):
+def run_exiftool(root_dir: str, params: list[str], on_error: bool = True) -> str | None:
     logger.debug(
         f"Running ExifTool with params: {' '.join(params[:3])}..."
     )  # Show first few params
@@ -290,3 +294,4 @@ def run_exiftool(root_dir, params, on_error=True):
             logger.warning(
                 f"ExifTool returned non-zero exit code {e.returncode} but continuing"
             )
+        return None

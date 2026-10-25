@@ -10,7 +10,13 @@ logger = logging.getLogger(__name__)
 MAX_SIZE = 1000000000
 
 
-def copy(root_dir, sorted_files, archive_dir, prefix, section=None):
+def copy(
+    root_dir: str,
+    sorted_files: list[str],
+    archive_dir: str,
+    prefix: str,
+    section: str | None = None,
+) -> bool:
     """Transcode MOVs and roll every sorted file into .tar archives.
 
     Returns True only if every entry was archived; False if any file was
@@ -27,8 +33,8 @@ def copy(root_dir, sorted_files, archive_dir, prefix, section=None):
     logger.info(f"Starting archive creation for {len(sorted_files)} files")
     index = 0
     size = 0
-    files = []
-    failed = []
+    files: list[str] = []
+    failed: list[str] = []
 
     for f in sorted_files:
         if f.endswith(".mov"):
@@ -90,7 +96,9 @@ def copy(root_dir, sorted_files, archive_dir, prefix, section=None):
     return not failed
 
 
-def create_tar(root_dir, sorted_files, archive_dir, prefix, index):
+def create_tar(
+    root_dir: str, sorted_files: list[str], archive_dir: str, prefix: str, index: int
+) -> tuple[list[str], int]:
     """Write the given files into a single .tar at archive_dir/<prefix>-<index>.tar.
 
     Returns ``(missing, archive_size)``: the list of entries that could not be
@@ -116,6 +124,9 @@ def create_tar(root_dir, sorted_files, archive_dir, prefix, index):
         logger.info(f"Archive created successfully: {tar_file} ({archive_size} bytes)")
 
     except Exception as e:
+        # tarfile/OS errors come in many types; log with context before
+        # re-raising so the caller's archive-completeness tracking still
+        # sees the failure.
         logger.error(f"Failed to create archive {tar_file}: {e}")
         raise
 
