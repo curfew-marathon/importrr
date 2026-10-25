@@ -41,8 +41,15 @@ def main_process() -> int:
                 logger.info(
                     f"Processing section {i}/{total_sections}: {d.get('album')}"
                 )
-                sort = Sort(d.get("album"), d.get("archive"), d.get("section"))
-                for import_dir in d.get("import"):
+                # "album", "archive", "import" are unconditionally populated
+                # by Config.get_data() for every section; .get() still types
+                # as Optional since d is dict[str, Any].
+                sort = Sort(
+                    d.get("album"),  # type: ignore[arg-type]
+                    d.get("archive"),
+                    d.get("section"),
+                )
+                for import_dir in d.get("import"):  # type: ignore[union-attr]
                     sort.launch(import_dir)
             except Exception as e:  # noqa: BLE001
                 failed += 1
