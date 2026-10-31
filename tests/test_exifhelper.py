@@ -2,6 +2,7 @@ import os
 import shutil
 import struct
 import subprocess
+import time
 import zlib
 from unittest.mock import call, patch
 
@@ -558,14 +559,29 @@ def _tag(path, tag):
     return out.stdout.strip()
 
 
+@pytest.fixture(params=["UTC", "Asia/Karachi", "Pacific/Kiritimati"])
+def zone(request, monkeypatch):
+    """Run under zones far from UTC-4 so a UTC-epoch mtime would roll the date."""
+    monkeypatch.setenv("TZ", request.param)
+    time.tzset()
+    yield request.param
+    monkeypatch.undo()
+    time.tzset()
+
+
 @needs_exiftool
-def test_dateless_png_gets_mtime_in_datetimeoriginal_but_not_xmp(tmp_path, monkeypatch):
+def test_dateless_png_gets_mtime_in_datetimeoriginal_but_not_xmp(
+    tmp_path, monkeypatch, zone
+):
     from importrr.exifhelper import adjust_screenshots
 
     monkeypatch.chdir(tmp_path)
     png = tmp_path / "shot.png"
     _write_png(png)
-    os.utime(png, (1788811200, 1788811200))  # 2026-09-07 20:00:00 UTC
+    # Local wall-clock midday: exiftool renders FileModifyDate in the host zone,
+    # so a fixed UTC epoch would land on a different day east of UTC+4.
+    mtime = time.mktime((2026, 9, 7, 12, 0, 0, 0, 0, -1))
+    os.utime(png, (mtime, mtime))
 
     adjust_screenshots(str(tmp_path), str(tmp_path))
 
