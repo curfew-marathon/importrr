@@ -32,6 +32,9 @@ jobs:
         pip install ruff==0.16.3 pytest pytest-cov mypy pip-audit
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
+    - name: Install ExifTool
+      run: sudo apt-get update && sudo apt-get install -y libimage-exiftool-perl
+
     - name: Lint and Format with ruff
       run: |
         ruff check .
