@@ -71,7 +71,7 @@ WORKDIR_LEFTOVER_FILES = Gauge(
 )
 DATES_GUESSED_FROM_MTIME_TOTAL = Counter(
     "importrr_dates_guessed_from_mtime_total",
-    "Images given a capture date from their file mtime because no embedded date "
+    "Images and videos given a capture date from their file mtime because no embedded date "
     "(EXIF/XMP/IPTC/GPS/PNG) was present - the guess is often wrong",
 )
 BATCH_DURATION_SECONDS = Histogram(

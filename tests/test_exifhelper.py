@@ -4,7 +4,7 @@ import struct
 import subprocess
 import time
 import zlib
-from unittest.mock import call, patch
+from unittest.mock import MagicMock, call, patch
 
 import pytest
 
@@ -80,8 +80,11 @@ def test_backfill_video_tag_params(mock_run_exiftool, tag):
     mock_run_exiftool.assert_called_once_with(root_dir, expected_params)
 
 
+@patch("importrr.exifhelper._stamp_from_mtime")
 @patch("importrr.exifhelper.backfill_video_tag")
-def test_backfill_videos_runs_creationdate_then_createdate(mock_backfill_video_tag):
+def test_backfill_videos_runs_creationdate_then_createdate(
+    mock_backfill_video_tag, mock_stamp
+):
     from importrr.exifhelper import backfill_videos
 
     backfill_videos("/test/import/dir", "/test/root/dir")
@@ -92,6 +95,59 @@ def test_backfill_videos_runs_creationdate_then_createdate(mock_backfill_video_t
             call("/test/import/dir", "/test/root/dir", "CreateDate"),
         ]
     )
+
+
+@patch("importrr.exifhelper._stamp_from_mtime")
+@patch("importrr.exifhelper.backfill_video_tag")
+def test_backfill_videos_falls_back_to_mtime_last(mock_backfill_video_tag, mock_stamp):
+    from importrr.exifhelper import _VIDEO_EXTS, backfill_videos
+
+    parent = MagicMock()
+    parent.attach_mock(mock_backfill_video_tag, "tag")
+    parent.attach_mock(mock_stamp, "stamp")
+
+    backfill_videos("/imp", "/root")
+
+    # Embedded tags get first refusal; the mtime guess only fills what is left.
+    assert [c[0] for c in parent.mock_calls] == ["tag", "tag", "stamp"]
+    mock_stamp.assert_called_once_with("/imp", "/root", _VIDEO_EXTS, "DateTimeOriginal")
+
+
+@patch("importrr.exifhelper.metrics.DATES_GUESSED_FROM_MTIME_TOTAL")
+@patch("importrr.exifhelper.run_exiftool")
+def test_video_mtime_pass_params_warns_and_counts(
+    mock_run_exiftool, mock_counter, caplog
+):
+    from importrr.exifhelper import backfill_videos
+
+    # Calls: CreationDate pass, CreateDate pass, dateless probe, mtime pass.
+    mock_run_exiftool.side_effect = [None, None, "clip.mp4\n", None]
+
+    with caplog.at_level("WARNING"):
+        backfill_videos("/imp", "/root")
+
+    assert mock_run_exiftool.call_args_list[-1] == call(
+        "/root",
+        [
+            "-overwrite_original",
+            "-P",
+            "-DateTimeOriginal<FileModifyDate",
+            "-if",
+            "not $datetimeoriginal",
+            "-ext",
+            "MOV",
+            "-ext",
+            "MP4",
+            "-ext",
+            "3GP",
+            "/imp",
+        ],
+    )
+    assert any(
+        "No capture date in clip.mp4 - using file mtime" in r.message
+        for r in caplog.records
+    )
+    mock_counter.inc.assert_called_once_with()
 
 
 @patch("importrr.exifhelper.run_exiftool")
@@ -276,7 +332,7 @@ def test_adjust_screenshots_does_not_count_when_mtime_pass_fails(
 
 
 @patch("importrr.exifhelper.metrics.DATES_GUESSED_FROM_MTIME_TOTAL")
-@patch("importrr.exifhelper._images_missing_capture_date")
+@patch("importrr.exifhelper._missing_capture_date")
 @patch("importrr.exifhelper.run_exiftool")
 def test_adjust_screenshots_survives_probe_failure(
     mock_run_exiftool, mock_probe, mock_counter, caplog
@@ -301,14 +357,37 @@ def test_adjust_screenshots_survives_probe_failure(
 
 
 @patch("importrr.exifhelper.run_exiftool")
-def test_images_missing_capture_date_parses_and_tolerates_empty(mock_run_exiftool):
-    from importrr.exifhelper import _images_missing_capture_date
+def test_missing_capture_date_parses_and_tolerates_empty(mock_run_exiftool):
+    from importrr.exifhelper import _IMAGE_EXTS, _missing_capture_date
 
     mock_run_exiftool.return_value = "one.jpg\ntwo.png\n\n"
-    assert _images_missing_capture_date("/imp", "/root") == ["one.jpg", "two.png"]
+    assert _missing_capture_date("/imp", "/root", _IMAGE_EXTS) == ["one.jpg", "two.png"]
 
     mock_run_exiftool.return_value = None  # exiftool exit 2 -> run_exiftool -> None
-    assert _images_missing_capture_date("/imp", "/root") == []
+    assert _missing_capture_date("/imp", "/root", _IMAGE_EXTS) == []
+
+
+@patch("importrr.exifhelper.run_exiftool")
+def test_missing_capture_date_filters_by_the_given_extensions(mock_run_exiftool):
+    from importrr.exifhelper import _VIDEO_EXTS, _missing_capture_date
+
+    mock_run_exiftool.return_value = None
+    _missing_capture_date("/imp", "/root", _VIDEO_EXTS)
+
+    params = mock_run_exiftool.call_args.args[1]
+    assert params == [
+        "-if",
+        "not $datetimeoriginal",
+        "-p",
+        "$filename",
+        "-ext",
+        "MOV",
+        "-ext",
+        "MP4",
+        "-ext",
+        "3GP",
+        "/imp",
+    ]
 
 
 @patch("importrr.exifhelper.os.chdir")
@@ -615,3 +694,67 @@ def test_png_with_real_createdate_still_beats_mtime(tmp_path, monkeypatch):
 
     assert first.startswith("2025:04:11")
     assert _tag(png, "DateTimeOriginal") == first
+
+
+def _write_mp4(path):
+    """A minimal MP4 (ftyp + moov/mvhd) whose mvhd times are zero, i.e. dateless."""
+
+    def box(kind, data):
+        return struct.pack(">I", 8 + len(data)) + kind + data
+
+    mvhd = (
+        struct.pack(">B3sIIII", 0, b"\0\0\0", 0, 0, 1000, 1000)
+        + struct.pack(">IH10s", 0x00010000, 0x0100, b"\0" * 10)
+        + struct.pack(">9I", 0x10000, 0, 0, 0, 0x10000, 0, 0, 0, 0x40000000)
+        + b"\0" * 24
+        + struct.pack(">I", 2)
+    )
+    path.write_bytes(
+        box(b"ftyp", b"isom" + struct.pack(">I", 512) + b"isomiso2")
+        + box(b"moov", box(b"mvhd", mvhd))
+    )
+
+
+@needs_exiftool
+def test_dateless_video_is_organized_by_mtime_and_dated_one_is_untouched(
+    tmp_path, monkeypatch, zone, caplog
+):
+    """End to end: a video with no embedded date is placed by its mtime instead of
+    staying in the work dir, a video with a real CreateDate keeps it (old behavior),
+    and the mtime is not bumped by the stamp."""
+    from importrr.exifhelper import backfill_videos, organize
+
+    monkeypatch.chdir(tmp_path)
+    imp, root = tmp_path / "imp", tmp_path / "root"
+    imp.mkdir()
+    root.mkdir()
+    mtime = time.mktime((2026, 9, 7, 12, 0, 0, 0, 0, -1))
+    for name in ("nodate.mp4", "hasdate.mp4"):
+        _write_mp4(imp / name)
+    subprocess.run(  # noqa: S603
+        [  # noqa: S607
+            "exiftool",
+            "-q",
+            "-overwrite_original",
+            "-QuickTime:CreateDate=2024:10:21 15:49:55",
+            str(imp / "hasdate.mp4"),
+        ],
+        check=True,
+    )
+    for name in ("nodate.mp4", "hasdate.mp4"):
+        os.utime(imp / name, (mtime, mtime))
+
+    with caplog.at_level("WARNING"):
+        backfill_videos(str(imp), str(root))
+    assert os.stat(imp / "nodate.mp4").st_mtime == mtime
+    organize(str(imp), str(root))
+
+    placed = sorted(p.relative_to(root).as_posix() for p in root.rglob("*.mp4"))
+    assert len(placed) == 2
+    assert [p for p in placed if p.startswith("2026/09/20260907-12")]
+    assert [p for p in placed if p.startswith("2024/10/")]
+    assert list(imp.iterdir()) == []
+    guesses = [r.message for r in caplog.records if "using file mtime" in r.message]
+    assert guesses == [
+        "No capture date in nodate.mp4 - using file mtime (likely wrong)"
+    ]

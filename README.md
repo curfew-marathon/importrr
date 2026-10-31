@@ -58,8 +58,9 @@ Every batch that leaves files behind tells you why, in two places:
   has a `skipped:` list of `{name, reason}` alongside the files themselves.
 
 The most common reason is **no capture date** - importrr sorts by
-`DateTimeOriginal`, and a file with no derivable date (often a video, since
-videos get no `FileModifyDate` fallback) cannot be placed. Fix the date and drop
+`DateTimeOriginal`, and a file with no derivable date cannot be placed. Images
+and videos with no embedded date fall back to the file's modification time (logged
+as `No capture date in ... using file mtime (likely wrong)`). Fix the date and drop
 the file back into the import directory to retry. Other reasons are unreadable or
 corrupt files and unsupported file types.
 
