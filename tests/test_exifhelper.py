@@ -1,3 +1,8 @@
+import os
+import shutil
+import struct
+import subprocess
+import zlib
 from unittest.mock import call, patch
 
 import pytest
@@ -192,7 +197,6 @@ def test_adjust_screenshots_params(mock_run_exiftool):
                     "-overwrite_original",
                     "-P",
                     "-EXIF:DateTimeOriginal<FileModifyDate",
-                    "-XMP:DateCreated<FileModifyDate",
                 ]
                 + common,
             ),
@@ -499,3 +503,99 @@ def test_media_type_for(path, expected):
     from importrr.exifhelper import media_type_for
 
     assert media_type_for(path) == expected
+
+
+@patch("importrr.exifhelper.run_exiftool")
+def test_adjust_screenshots_mtime_pass_never_writes_xmp(mock_run_exiftool):
+    """A guessed mtime goes to DateTimeOriginal only. XMP:DateCreated outranks
+    PNG:CreateDate in Pass A, so a stamped guess would beat a real date later."""
+    from importrr.exifhelper import adjust_screenshots
+
+    mock_run_exiftool.return_value = None
+
+    adjust_screenshots("/imp", "/root")
+
+    mtime_calls = [
+        c
+        for c in mock_run_exiftool.call_args_list
+        if "-EXIF:DateTimeOriginal<FileModifyDate" in c.args[1]
+    ]
+    assert len(mtime_calls) == 1
+    assert not [
+        a for a in mtime_calls[0].args[1] if a.startswith("-XMP:") or "XMP" in a
+    ]
+
+
+needs_exiftool = pytest.mark.skipif(
+    shutil.which("exiftool") is None, reason="exiftool not installed"
+)
+
+
+def _write_png(path):
+    def chunk(kind, data):
+        body = kind + data
+        return (
+            struct.pack(">I", len(data))
+            + body
+            + struct.pack(">I", zlib.crc32(body) & 0xFFFFFFFF)
+        )
+
+    path.write_bytes(
+        b"\x89PNG\r\n\x1a\n"
+        + chunk(b"IHDR", struct.pack(">IIBBBBB", 1, 1, 8, 2, 0, 0, 0))
+        + chunk(b"IDAT", zlib.compress(b"\x00\xff\x00\x00"))
+        + chunk(b"IEND", b"")
+    )
+
+
+def _tag(path, tag):
+    out = subprocess.run(  # noqa: S603
+        ["exiftool", "-s3", f"-{tag}", str(path)],  # noqa: S607
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return out.stdout.strip()
+
+
+@needs_exiftool
+def test_dateless_png_gets_mtime_in_datetimeoriginal_but_not_xmp(tmp_path, monkeypatch):
+    from importrr.exifhelper import adjust_screenshots
+
+    monkeypatch.chdir(tmp_path)
+    png = tmp_path / "shot.png"
+    _write_png(png)
+    os.utime(png, (1788811200, 1788811200))  # 2026-09-07 20:00:00 UTC
+
+    adjust_screenshots(str(tmp_path), str(tmp_path))
+
+    assert _tag(png, "DateTimeOriginal").startswith("2026:09:07")
+    assert _tag(png, "XMP:DateCreated") == ""
+
+
+@needs_exiftool
+def test_png_with_real_createdate_still_beats_mtime(tmp_path, monkeypatch):
+    """Old behavior: an embedded source still wins over the mtime guess."""
+    from importrr.exifhelper import adjust_screenshots
+
+    monkeypatch.chdir(tmp_path)
+    png = tmp_path / "real.png"
+    _write_png(png)
+    subprocess.run(  # noqa: S603
+        [
+            "exiftool",
+            "-q",
+            "-overwrite_original",
+            "-PNG:CreateDate=2025:04:11 22:28:56",
+            str(png),
+        ],  # noqa: S607
+        check=True,
+    )
+    os.utime(png, (1788811200, 1788811200))
+
+    adjust_screenshots(str(tmp_path), str(tmp_path))
+    first = _tag(png, "DateTimeOriginal")
+    adjust_screenshots(str(tmp_path), str(tmp_path))
+
+    assert first.startswith("2025:04:11")
+    assert _tag(png, "DateTimeOriginal") == first

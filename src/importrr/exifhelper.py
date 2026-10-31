@@ -136,12 +136,14 @@ def adjust_screenshots(import_dir: str, root_dir: str) -> None:
         logger.warning(f"Could not enumerate dateless files before mtime pass: {e}")
         guessed = []
 
-    # Pass B: last resort - the file modify date.
+    # Pass B: last resort - the file modify date. DateTimeOriginal only: a
+    # guessed mtime must not also be written to XMP:DateCreated, which Pass A
+    # ranks above PNG:CreateDate and would let the guess outrank a real date on a
+    # later run.
     params = [
         "-overwrite_original",
         "-P",
         "-EXIF:DateTimeOriginal<FileModifyDate",
-        "-XMP:DateCreated<FileModifyDate",
     ] + common_params
     run_exiftool(root_dir, params)
 
