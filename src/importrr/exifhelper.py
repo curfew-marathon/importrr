@@ -128,36 +128,51 @@ def adjust_screenshots(import_dir: str, root_dir: str) -> None:
         params.append(f"-XMP:DateCreated<{source}")
     run_exiftool(root_dir, params + common_params)
 
-    # Snapshot what is still dateless before Pass B stamps it. Best effort: a
-    # probe failure must not stop the batch from being sorted.
+    # Pass B: last resort - the file modify date.
+    _stamp_from_mtime(import_dir, root_dir, _IMAGE_EXTS, "EXIF:DateTimeOriginal")
+
+
+def _stamp_from_mtime(
+    import_dir: str, root_dir: str, exts: Iterable[str], tag: str
+) -> None:
+    """Stamp ``tag`` from the file mtime on files of ``exts`` that still have no
+    ``DateTimeOriginal``, logging and counting each guess.
+
+    ``tag`` is the only thing written: a guessed mtime must not also go to
+    XMP:DateCreated, which Pass A ranks above PNG:CreateDate and would let the
+    guess outrank a real date on a later run.
+    """
+    # Snapshot what is still dateless before it is stamped. Best effort: a probe
+    # failure must not stop the batch from being sorted.
     try:
-        guessed = _images_missing_capture_date(import_dir, root_dir)
+        guessed = _missing_capture_date(import_dir, root_dir, exts)
     except Exception as e:  # noqa: BLE001
         logger.warning(f"Could not enumerate dateless files before mtime pass: {e}")
         guessed = []
 
-    # Pass B: last resort - the file modify date. DateTimeOriginal only: a
-    # guessed mtime must not also be written to XMP:DateCreated, which Pass A
-    # ranks above PNG:CreateDate and would let the guess outrank a real date on a
-    # later run.
     params = [
         "-overwrite_original",
         "-P",
-        "-EXIF:DateTimeOriginal<FileModifyDate",
-    ] + common_params
+        f"-{tag}<FileModifyDate",
+        "-if",
+        "not $datetimeoriginal",
+        *_ext_args(exts),
+        import_dir,
+    ]
     run_exiftool(root_dir, params)
 
-    # Pass B completed: record what it had to guess. Kept after the call so a
-    # Pass B failure (which aborts the batch) does not leave phantom warnings or
-    # inflate the counter for dates that were never written.
+    # Recorded after the call so a failure (which aborts the batch) does not
+    # leave phantom warnings or inflate the counter for dates never written.
     for name in guessed:
         logger.warning(f"No capture date in {name} - using file mtime (likely wrong)")
         metrics.DATES_GUESSED_FROM_MTIME_TOTAL.inc()
 
 
-def _images_missing_capture_date(import_dir: str, root_dir: str) -> list[str]:
-    """Basenames of still images (:data:`_IMAGE_EXTS`) under ``import_dir`` that
-    still have no ``DateTimeOriginal``.
+def _missing_capture_date(
+    import_dir: str, root_dir: str, exts: Iterable[str]
+) -> list[str]:
+    """Basenames of files of ``exts`` under ``import_dir`` that still have no
+    ``DateTimeOriginal``.
 
     ExifTool does the filtering natively (``-if`` + ``-p``) and prints only the
     failing names, so Python never loads a per-file tag dict (the ``get_tags``
@@ -169,7 +184,7 @@ def _images_missing_capture_date(import_dir: str, root_dir: str) -> list[str]:
         "not $datetimeoriginal",
         "-p",
         "$filename",
-        *_ext_args(_IMAGE_EXTS),
+        *_ext_args(exts),
         import_dir,
     ]
     # on_error=False: ExifTool exits 2 ("all files failed the condition") when
@@ -197,6 +212,9 @@ def backfill_videos(import_dir: str, root_dir: str) -> None:
     logger.info("Backfilling video metadata dates")
     backfill_video_tag(import_dir, root_dir, "CreationDate")
     backfill_video_tag(import_dir, root_dir, "CreateDate")
+    # Same last resort as images, so a video with no embedded date is still
+    # placed instead of staying in its work_dir forever.
+    _stamp_from_mtime(import_dir, root_dir, _VIDEO_EXTS, "DateTimeOriginal")
 
 
 def backfill_video_tag(import_dir: str, root_dir: str, tag: str) -> None:
