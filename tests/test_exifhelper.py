@@ -110,7 +110,9 @@ def test_backfill_videos_falls_back_to_mtime_last(mock_backfill_video_tag, mock_
 
     # Embedded tags get first refusal; the mtime guess only fills what is left.
     assert [c[0] for c in parent.mock_calls] == ["tag", "tag", "stamp"]
-    mock_stamp.assert_called_once_with("/imp", "/root", _VIDEO_EXTS, "DateTimeOriginal")
+    mock_stamp.assert_called_once_with(
+        "/imp", "/root", _VIDEO_EXTS, ("DateTimeOriginal",)
+    )
 
 
 @patch("importrr.exifhelper.metrics.DATES_GUESSED_FROM_MTIME_TOTAL")
@@ -230,6 +232,7 @@ def test_adjust_screenshots_params(mock_run_exiftool):
     for source in _EMBEDDED_DATE_SOURCES:
         embedded += [
             f"-EXIF:DateTimeOriginal<{source}",
+            f"-XMP-exif:DateTimeOriginal<{source}",
             f"-XMP:DateCreated<{source}",
         ]
 
@@ -254,6 +257,7 @@ def test_adjust_screenshots_params(mock_run_exiftool):
                     "-overwrite_original",
                     "-P",
                     "-EXIF:DateTimeOriginal<FileModifyDate",
+                    "-XMP-exif:DateTimeOriginal<FileModifyDate",
                 ]
                 + common,
             ),
@@ -587,8 +591,9 @@ def test_media_type_for(path, expected):
 
 @patch("importrr.exifhelper.run_exiftool")
 def test_adjust_screenshots_mtime_pass_never_writes_xmp(mock_run_exiftool):
-    """A guessed mtime goes to DateTimeOriginal only. XMP:DateCreated outranks
-    PNG:CreateDate in Pass A, so a stamped guess would beat a real date later."""
+    """A guessed mtime goes to DateTimeOriginal (EXIF + XMP-exif) only.
+    XMP:DateCreated outranks PNG:CreateDate in Pass A, so a stamped guess would
+    beat a real date later."""
     from importrr.exifhelper import adjust_screenshots
 
     mock_run_exiftool.return_value = None
@@ -601,8 +606,10 @@ def test_adjust_screenshots_mtime_pass_never_writes_xmp(mock_run_exiftool):
         if "-EXIF:DateTimeOriginal<FileModifyDate" in c.args[1]
     ]
     assert len(mtime_calls) == 1
-    assert not [
-        a for a in mtime_calls[0].args[1] if a.startswith("-XMP:") or "XMP" in a
+    written = [a for a in mtime_calls[0].args[1] if a.endswith("<FileModifyDate")]
+    assert written == [
+        "-EXIF:DateTimeOriginal<FileModifyDate",
+        "-XMP-exif:DateTimeOriginal<FileModifyDate",
     ]
 
 
@@ -694,6 +701,94 @@ def test_png_with_real_createdate_still_beats_mtime(tmp_path, monkeypatch):
 
     assert first.startswith("2025:04:11")
     assert _tag(png, "DateTimeOriginal") == first
+
+
+def _write_c2pa_png(path):
+    """A dateless PNG with a C2PA/JUMBF block, as AI-generated images carry.
+    ExifTool silently drops an EXIF write into it ("IFD0 pointer references
+    previous JUMBFBox directory")."""
+
+    def box(kind, data):
+        return struct.pack(">I", 8 + len(data)) + kind + data
+
+    def chunk(kind, data):
+        body = kind + data
+        return (
+            struct.pack(">I", len(data))
+            + body
+            + struct.pack(">I", zlib.crc32(body) & 0xFFFFFFFF)
+        )
+
+    jumd = box(
+        b"jumd", bytes.fromhex("6332706100110010800000aa00389b71") + b"\x03c2pa\x00"
+    )
+    path.write_bytes(
+        b"\x89PNG\r\n\x1a\n"
+        + chunk(b"IHDR", struct.pack(">IIBBBBB", 1, 1, 8, 2, 0, 0, 0))
+        + chunk(b"caBX", box(b"jumb", jumd))
+        + chunk(b"IDAT", zlib.compress(b"\x00\xff\x00\x00"))
+        + chunk(b"IEND", b"")
+    )
+
+
+def _write_gif(path):
+    """A 1x1 GIF. GIF has no EXIF, so only XMP can carry a capture date."""
+    path.write_bytes(
+        b"GIF89a\x01\x00\x01\x00\x80\x00\x00\x00\x00\x00\xff\xff\xff"
+        b"!\xf9\x04\x01\x00\x00\x00\x00,\x00\x00\x00\x00\x01\x00\x01\x00\x00"
+        b"\x02\x02D\x01\x00;"
+    )
+
+
+@pytest.mark.parametrize("writer", [_write_gif, _write_c2pa_png], ids=["gif", "c2pa"])
+@needs_exiftool
+def test_formats_that_reject_exif_still_get_mtime_and_are_organized(
+    tmp_path, monkeypatch, writer
+):
+    """Regression: a GIF (no EXIF) or a C2PA PNG silently dropped the
+    EXIF:DateTimeOriginal mtime write, so the file stayed in the work dir."""
+    from importrr.exifhelper import adjust_screenshots, organize
+
+    monkeypatch.chdir(tmp_path)
+    img = tmp_path / "img.dat"
+    writer(img)
+    img = img.rename(tmp_path / ("img.gif" if writer is _write_gif else "img.png"))
+    mtime = time.mktime((2026, 9, 7, 12, 0, 0, 0, 0, -1))
+    os.utime(img, (mtime, mtime))
+
+    adjust_screenshots(str(tmp_path), str(tmp_path))
+    assert _tag(img, "DateTimeOriginal").startswith("2026:09:07")
+    assert _tag(img, "XMP:DateCreated") == ""
+
+    organize(str(tmp_path), str(tmp_path))
+    assert (tmp_path / "2026" / "09").is_dir()
+    assert not img.exists()
+
+
+@needs_exiftool
+def test_gif_with_xmp_datecreated_is_promoted_by_pass_a(tmp_path, monkeypatch):
+    """A file whose only date is XMP:DateCreated (e.g. stamped by an older run)
+    must be readable as DateTimeOriginal, not stay stuck."""
+    from importrr.exifhelper import adjust_screenshots
+
+    monkeypatch.chdir(tmp_path)
+    gif = tmp_path / "old.gif"
+    _write_gif(gif)
+    subprocess.run(  # noqa: S603
+        [
+            "exiftool",
+            "-q",
+            "-overwrite_original",  # noqa: S607
+            "-XMP:DateCreated=2022:03:26 19:11:22",
+            str(gif),
+        ],
+        check=True,
+    )
+    os.utime(gif, (1788811200, 1788811200))
+
+    adjust_screenshots(str(tmp_path), str(tmp_path))
+
+    assert _tag(gif, "DateTimeOriginal").startswith("2022:03:26")
 
 
 def _write_mp4(path):

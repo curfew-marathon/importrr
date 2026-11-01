@@ -28,7 +28,9 @@ _EMBEDDED_DATE_SOURCES = (
 )
 
 # Still-image formats whose capture date lives in EXIF (video uses QuickTime
-# tags instead - see backfill_videos). HEIC/HEIF are here too: an iPhone HEIC
+# tags instead - see backfill_videos). Dates are also written to XMP-exif: GIF
+# has no EXIF, and a PNG with a C2PA/JUMBF block makes ExifTool silently drop EXIF
+# writes. HEIC/HEIF are here too: an iPhone HEIC
 # normally carries a date, but one re-encoded by a messaging app or a converter
 # arrives stripped, exactly like an Instagram JPG, and should get the same
 # fallback rather than being left unorganized.
@@ -125,20 +127,26 @@ def adjust_screenshots(import_dir: str, root_dir: str) -> None:
     params = ["-overwrite_original", "-P"]
     for source in _EMBEDDED_DATE_SOURCES:
         params.append(f"-EXIF:DateTimeOriginal<{source}")
+        params.append(f"-XMP-exif:DateTimeOriginal<{source}")
         params.append(f"-XMP:DateCreated<{source}")
     run_exiftool(root_dir, params + common_params)
 
     # Pass B: last resort - the file modify date.
-    _stamp_from_mtime(import_dir, root_dir, _IMAGE_EXTS, "EXIF:DateTimeOriginal")
+    _stamp_from_mtime(
+        import_dir,
+        root_dir,
+        _IMAGE_EXTS,
+        ("EXIF:DateTimeOriginal", "XMP-exif:DateTimeOriginal"),
+    )
 
 
 def _stamp_from_mtime(
-    import_dir: str, root_dir: str, exts: Iterable[str], tag: str
+    import_dir: str, root_dir: str, exts: Iterable[str], tags: Iterable[str]
 ) -> None:
-    """Stamp ``tag`` from the file mtime on files of ``exts`` that still have no
+    """Stamp ``tags`` from the file mtime on files of ``exts`` that still have no
     ``DateTimeOriginal``, logging and counting each guess.
 
-    ``tag`` is the only thing written: a guessed mtime must not also go to
+    ``tags`` are the only things written: a guessed mtime must not also go to
     XMP:DateCreated, which Pass A ranks above PNG:CreateDate and would let the
     guess outrank a real date on a later run.
     """
@@ -153,7 +161,7 @@ def _stamp_from_mtime(
     params = [
         "-overwrite_original",
         "-P",
-        f"-{tag}<FileModifyDate",
+        *(f"-{tag}<FileModifyDate" for tag in tags),
         "-if",
         "not $datetimeoriginal",
         *_ext_args(exts),
@@ -214,7 +222,7 @@ def backfill_videos(import_dir: str, root_dir: str) -> None:
     backfill_video_tag(import_dir, root_dir, "CreateDate")
     # Same last resort as images, so a video with no embedded date is still
     # placed instead of staying in its work_dir forever.
-    _stamp_from_mtime(import_dir, root_dir, _VIDEO_EXTS, "DateTimeOriginal")
+    _stamp_from_mtime(import_dir, root_dir, _VIDEO_EXTS, ("DateTimeOriginal",))
 
 
 def backfill_video_tag(import_dir: str, root_dir: str, tag: str) -> None:
